@@ -4,6 +4,7 @@ SQLAlchemy==2.0.32
 aiosqlite==0.20.0
 # Requires Python <3.14; pydantic-core does not yet support CPython 3.14.
 pydantic==2.10.6
+pydantic-settings==2.6.1
 jinja2==3.1.4
 httpx==0.27.2
 beautifulsoup4==4.12.3
