@@ -356,6 +356,35 @@ async def analyze_game(
     )
 
 
+@router.post(
+    "/games/analyze-missing", response_model=list[schemas.AnalysisResponse]
+)
+async def analyze_games_without_scores(
+    session: AsyncSession = Depends(get_session),
+):
+    settings = get_settings()
+    games = await crud.list_games_without_engagement_scores(session)
+    responses: list[schemas.AnalysisResponse] = []
+
+    for game in games:
+        result = await pipeline.analyze_game(session, game, settings)
+        responses.append(
+            schemas.AnalysisResponse(
+                game_id=game.id,
+                main_story_achievement=(
+                    result.main_story_achievement.name
+                    if result.main_story_achievement
+                    else None
+                ),
+                hltb_main_story_hours=result.hltb_hours,
+                engagement_score=result.engagement_score,
+                notes=result.notes,
+            )
+        )
+
+    return responses
+
+
 @router.get("/engagement-scores/{score_id}", response_model=schemas.EngagementScoreRead)
 async def read_engagement_score(score_id: int, session: AsyncSession = Depends(get_session)):
     return await _get_related_or_404(session, models.EngagementScore, score_id)

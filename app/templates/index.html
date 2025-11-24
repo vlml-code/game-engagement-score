@@ -117,6 +117,34 @@
         flex-direction: column;
         gap: 0.4rem;
       }
+      .summary-card {
+        background: white;
+        border: 1px solid var(--muted-border-color);
+        border-radius: 0.9rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+      .summary-table th,
+      .summary-table td {
+        padding: 0.75rem;
+        text-align: left;
+      }
+      .summary-table thead {
+        background: #f5f7fb;
+        border-bottom: 1px solid var(--muted-border-color);
+      }
+      .summary-table tbody tr + tr {
+        border-top: 1px solid var(--muted-border-color);
+      }
+      .summary-table .muted {
+        color: var(--muted-color);
+      }
     </style>
   </head>
   <body>
@@ -132,6 +160,37 @@
           <span class="pill">Use the panels below to call the API without leaving this page.</span>
         </div>
       </header>
+
+      <section class="summary-card">
+        <div style="display:flex; justify-content: space-between; align-items:center; gap:1rem; flex-wrap: wrap">
+          <div>
+            <h2 style="margin:0">Game analytics at a glance</h2>
+            <p class="secondary-text" style="margin:0">Main-story detections, completion rates, playtime, and engagement score.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap: wrap">
+            <button id="analyze-all" type="button">Analyze games without scores</button>
+            <button id="refresh-games" type="button" class="secondary">Refresh games</button>
+          </div>
+        </div>
+        <div class="muted-bg" style="margin-top: 1rem; overflow-x: auto;">
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th>Game</th>
+                <th>Main-story achievement</th>
+                <th>% completed</th>
+                <th>Main story hours</th>
+                <th>Engagement score</th>
+              </tr>
+            </thead>
+            <tbody id="summary-rows">
+              <tr>
+                <td colspan="5" class="muted">Loading games...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section>
         <h2>Operations console</h2>
@@ -252,10 +311,7 @@
       </section>
 
       <section>
-        <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap">
-          <h2>Activity log</h2>
-          <button id="refresh-games" type="button" class="secondary">Refresh games</button>
-        </div>
+        <h2>Activity log</h2>
         <p class="secondary-text">Each submission below captures the outbound request and server response.</p>
         <div class="log-panel" id="log-panel" aria-live="polite"></div>
       </section>
@@ -273,6 +329,8 @@
       const gamesGrid = document.getElementById("games-grid");
       const emptyState = document.getElementById("empty-state");
       const refreshButton = document.getElementById("refresh-games");
+      const analyzeAllButton = document.getElementById("analyze-all");
+      const summaryRows = document.getElementById("summary-rows");
 
       const selects = {
         analyze: document.getElementById("analyze-game"),
@@ -370,6 +428,50 @@
         parsedSelect.innerHTML = "";
         parsedSelect.append(option("Select a guide", ""));
         guides.forEach((g) => parsedSelect.append(option(g.text, g.value)));
+      }
+
+      function renderSummaryTable(games) {
+        summaryRows.innerHTML = "";
+        if (!games.length) {
+          const row = document.createElement("tr");
+          const cell = document.createElement("td");
+          cell.colSpan = 5;
+          cell.textContent = "No games stored yet.";
+          cell.className = "muted";
+          row.append(cell);
+          summaryRows.append(row);
+          return;
+        }
+
+        games.forEach((game) => {
+          const row = document.createElement("tr");
+          const mainStory = game.achievements.find((a) => a.is_main_story_completion);
+          const latestHltb = game.hltb_times.at(-1);
+          const latestScore = game.engagement_scores.at(-1);
+
+          const cells = [
+            game.title,
+            mainStory?.name || "Not detected",
+            mainStory?.completion_rate != null
+              ? `${mainStory.completion_rate.toFixed(2)}%`
+              : "—",
+            latestHltb?.main_story_hours != null
+              ? `${latestHltb.main_story_hours.toFixed(2)} h`
+              : "—",
+            latestScore?.score != null ? latestScore.score.toFixed(1) : "—",
+          ];
+
+          cells.forEach((value) => {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            if (value === "—" || value === "Not detected") {
+              cell.className = "muted";
+            }
+            row.append(cell);
+          });
+
+          summaryRows.append(row);
+        });
       }
 
       function renderGames(games) {
@@ -480,6 +582,7 @@
         }
         const games = await response.json();
         updateSelects(games);
+        renderSummaryTable(games);
         renderGames(games);
         log(`Loaded ${games.length} game(s)`, "success");
       }
@@ -622,6 +725,36 @@
         "/api/engagement-scores",
         "Create engagement score"
       );
+
+      analyzeAllButton.addEventListener("click", async () => {
+        analyzeAllButton.disabled = true;
+        try {
+          const results = await postJSON(
+            "/api/games/analyze-missing",
+            {},
+            "Analyze games without scores"
+          );
+          if (!results?.length) {
+            log("No games without engagement scores were found.");
+          }
+          results?.forEach((result) => {
+            log(
+              `Analysis for game #${result.game_id}: main story = ${
+                result.main_story_achievement ?? "n/a"
+              }, HLTB = ${
+                result.hltb_main_story_hours ?? "n/a"
+              } hours, engagement = ${result.engagement_score ?? "n/a"}`,
+              "success"
+            );
+            result.notes?.forEach((note) => log(note));
+          });
+          await refreshGames();
+        } catch (err) {
+          log(err.message, "error");
+        } finally {
+          analyzeAllButton.disabled = false;
+        }
+      });
 
       refreshButton.addEventListener("click", refreshGames);
       refreshGames();
