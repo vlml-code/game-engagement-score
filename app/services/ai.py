@@ -38,14 +38,8 @@ class AchievementAI:
         guides: Iterable[str],
     ) -> str | None:
         await self._throttle()
-        guide_snippets = []
-        for text in guides:
-            snippet = text.strip()
-            if not snippet:
-                continue
-            guide_snippets.append(snippet[:800])
-            if len(guide_snippets) >= 3:
-                break
+
+        guide_text = next((text.strip() for text in guides if text.strip()), "")
 
         achievement_lines = []
         for ach in achievements:
@@ -56,19 +50,20 @@ class AchievementAI:
             achievement_lines.append(line)
 
         system_prompt = (
-            "You are helping mark the achievement that corresponds to finishing the main story/campaign. "
-            "Only reply with the exact achievement name. If none of the achievements clearly indicate "
-            "main story completion, respond with NONE."
+            "You label the single achievement that marks completing the main story/campaign. "
+            "Respond ONLY with that exact achievement name. If no achievement clearly represents "
+            "finishing the main story, reply with NONE. Do not add quotes or any extra text."
         )
 
-        user_prompt = (
-            "Game title: "
-            f"{game_title}\n\nAchievements:\n" + "\n".join(achievement_lines)
-        )
-        if guide_snippets:
-            user_prompt += "\n\nGuide excerpts to help you decide:\n" + "\n---\n".join(
-                guide_snippets
-            )
+        user_sections = [
+            f"Game title: {game_title}",
+            "Achievements:",
+            "\n".join(achievement_lines),
+        ]
+        if guide_text:
+            user_sections.append("Guide content (first guide only):")
+            user_sections.append(guide_text)
+        user_prompt = "\n\n".join(user_sections)
 
         try:
             response = await self.client.chat.completions.create(
@@ -78,16 +73,20 @@ class AchievementAI:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0,
-                max_tokens=20,
+                # Some newer models reject `max_tokens`; use `max_completion_tokens` instead.
+                max_completion_tokens=20,
             )
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
 
-        content = response.choices[0].message.content if response.choices else None
+        content = ""
+        if response.choices:
+            content = response.choices[0].message.content or ""
+        content = content.strip()
         if not content:
             return None
 
-        cleaned = content.strip().splitlines()[0].strip('" ')
+        cleaned = content.splitlines()[0].strip('" ')
         if cleaned.upper() == "NONE":
             return None
         return cleaned

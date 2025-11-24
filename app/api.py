@@ -5,6 +5,7 @@ from app import crud, models, schemas
 from app.config import get_settings
 from app.db import get_session
 from app.services import pipeline
+from app.services.guides import GuideParser, GuideParserError
 from app.services.steam import SteamService, SteamServiceError
 
 router = APIRouter()
@@ -58,7 +59,9 @@ async def create_achievement(
     achievement_in: schemas.AchievementCreate, session: AsyncSession = Depends(get_session)
 ):
     await _get_related_or_404(session, models.Game, achievement_in.game_id)
-    created = await crud.create_related(session, models.Achievement, achievement_in.dict())
+    created = await crud.create_related(
+        session, models.Achievement, achievement_in.model_dump()
+    )
     return created
 
 
@@ -92,7 +95,7 @@ async def delete_achievement(achievement_id: int, session: AsyncSession = Depend
 @router.post("/guides", response_model=schemas.GuideRead, status_code=status.HTTP_201_CREATED)
 async def create_guide(guide_in: schemas.GuideCreate, session: AsyncSession = Depends(get_session)):
     await _get_related_or_404(session, models.Game, guide_in.game_id)
-    return await crud.create_related(session, models.Guide, guide_in.dict())
+    return await crud.create_related(session, models.Guide, guide_in.model_dump())
 
 
 @router.get("/guides", response_model=list[schemas.GuideRead])
@@ -127,7 +130,9 @@ async def create_parsed_content(
     parsed_in: schemas.ParsedGuideContentCreate, session: AsyncSession = Depends(get_session)
 ):
     await _get_related_or_404(session, models.Guide, parsed_in.guide_id)
-    return await crud.create_related(session, models.ParsedGuideContent, parsed_in.dict())
+    return await crud.create_related(
+        session, models.ParsedGuideContent, parsed_in.model_dump()
+    )
 
 
 @router.get("/parsed-content", response_model=list[schemas.ParsedGuideContentRead])
@@ -159,7 +164,7 @@ async def delete_parsed_content(content_id: int, session: AsyncSession = Depends
 @router.post("/hltb-times", response_model=schemas.HLTBTimeRead, status_code=status.HTTP_201_CREATED)
 async def create_hltb_time(time_in: schemas.HLTBTimeCreate, session: AsyncSession = Depends(get_session)):
     await _get_related_or_404(session, models.Game, time_in.game_id)
-    return await crud.create_related(session, models.HLTBTime, time_in.dict())
+    return await crud.create_related(session, models.HLTBTime, time_in.model_dump())
 
 
 @router.get("/hltb-times", response_model=list[schemas.HLTBTimeRead])
@@ -195,7 +200,9 @@ async def create_engagement_score(
     score_in: schemas.EngagementScoreCreate, session: AsyncSession = Depends(get_session)
 ):
     await _get_related_or_404(session, models.Game, score_in.game_id)
-    return await crud.create_related(session, models.EngagementScore, score_in.dict())
+    return await crud.create_related(
+        session, models.EngagementScore, score_in.model_dump()
+    )
 
 
 @router.get("/engagement-scores", response_model=list[schemas.EngagementScoreRead])
@@ -236,6 +243,7 @@ async def import_from_steam(
 
     results: list[schemas.SteamImportResult] = []
 
+    parser: GuideParser | None = None
     async with SteamService(
         api_key=settings.steam_api_key, request_interval=settings.steam_request_interval
     ) as steam:
@@ -243,6 +251,7 @@ async def import_from_steam(
             created_game = False
             achievements_added = 0
             guides_added = 0
+            guides_parsed = 0
             status_message = "ok"
             error_message: str | None = None
 
@@ -275,8 +284,33 @@ async def import_from_steam(
             )
 
             try:
-                guides = await steam.fetch_guides(app_id)
+                guides = await steam.fetch_guides(
+                    app_id, search_text=settings.steam_guide_search_text
+                )
                 guides_added = await crud.add_guides(session, game.id, guides)
+                first_guide_url = guides[0]["url"] if guides else None
+                if first_guide_url:
+                    parser = parser or GuideParser(
+                        request_interval=settings.guide_request_interval
+                    )
+                    guide_row = await crud.get_guide_by_url(
+                        session, game.id, first_guide_url
+                    )
+                    if guide_row:
+                        has_parsed = await crud.has_parsed_content(session, guide_row.id)
+                        if not has_parsed:
+                            try:
+                                text, sections = await parser.fetch_and_parse(first_guide_url)
+                                await crud.add_parsed_content(
+                                    session,
+                                    guide_id=guide_row.id,
+                                    content=text,
+                                    section_count=sections,
+                                )
+                                guides_parsed = 1
+                            except GuideParserError as exc:
+                                status_message = "partial"
+                                error_message = str(exc)
             except SteamServiceError as exc:
                 status_message = "partial"
                 error_message = str(exc)
@@ -288,10 +322,14 @@ async def import_from_steam(
                     created_game=created_game,
                     achievements_added=achievements_added,
                     guides_added=guides_added,
+                    guides_parsed=guides_parsed,
                     status=status_message,
                     error=error_message,
                 )
             )
+
+    if parser:
+        await parser.aclose()
 
     return schemas.SteamImportResponse(results=results)
 

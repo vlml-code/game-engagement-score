@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class AchievementBase(BaseModel):
+class ORMBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AchievementBase(ORMBase):
     name: str
     description: Optional[str] = None
     points: Optional[int] = None
@@ -30,11 +36,10 @@ class AchievementRead(AchievementBase):
     id: int
     game_id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-class GuideBase(BaseModel):
+class GuideBase(ORMBase):
     title: str
     url: Optional[str] = None
     author: Optional[str] = None
@@ -52,12 +57,12 @@ class GuideRead(GuideBase):
     id: int
     game_id: int
     created_at: datetime
+    parsed_content: list[ParsedGuideContentRead] = Field(default_factory=list)
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-class ParsedGuideContentBase(BaseModel):
+class ParsedGuideContentBase(ORMBase):
     content: str
     section_count: Optional[int] = None
 
@@ -74,11 +79,10 @@ class ParsedGuideContentRead(ParsedGuideContentBase):
     id: int
     guide_id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-class HLTBTimeBase(BaseModel):
+class HLTBTimeBase(ORMBase):
     main_story_hours: Optional[float] = None
     extras_hours: Optional[float] = None
     completionist_hours: Optional[float] = None
@@ -97,11 +101,10 @@ class HLTBTimeRead(HLTBTimeBase):
     game_id: int
     last_updated: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-class EngagementScoreBase(BaseModel):
+class EngagementScoreBase(ORMBase):
     score: float = Field(..., ge=0)
     method: Optional[str] = None
     notes: Optional[str] = None
@@ -120,11 +123,10 @@ class EngagementScoreRead(EngagementScoreBase):
     game_id: int
     calculated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-class GameBase(BaseModel):
+class GameBase(ORMBase):
     title: str
     steam_app_id: Optional[int] = None
     genre: Optional[str] = None
@@ -144,38 +146,38 @@ class GameUpdate(GameBase):
 class GameRead(GameBase):
     id: int
     created_at: datetime
-    achievements: list[AchievementRead] = []
-    guides: list[GuideRead] = []
-    hltb_times: list[HLTBTimeRead] = []
-    engagement_scores: list[EngagementScoreRead] = []
+    achievements: list[AchievementRead] = Field(default_factory=list)
+    guides: list[GuideRead] = Field(default_factory=list)
+    hltb_times: list[HLTBTimeRead] = Field(default_factory=list)
+    engagement_scores: list[EngagementScoreRead] = Field(default_factory=list)
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-class SteamImportRequest(BaseModel):
+class SteamImportRequest(ORMBase):
     app_ids_text: str = Field(
         ..., description="Comma, whitespace, or newline-separated Steam app IDs"
     )
 
 
-class SteamImportResult(BaseModel):
+class SteamImportResult(ORMBase):
     app_id: int
     game_id: Optional[int] = None
     created_game: bool = False
     achievements_added: int = 0
     guides_added: int = 0
+    guides_parsed: int = 0
     status: str
     error: Optional[str] = None
 
 
-class SteamImportResponse(BaseModel):
+class SteamImportResponse(ORMBase):
     results: list[SteamImportResult]
 
 
-class AnalysisResponse(BaseModel):
+class AnalysisResponse(ORMBase):
     game_id: int
     main_story_achievement: Optional[str] = None
     hltb_main_story_hours: Optional[float] = None
     engagement_score: Optional[float] = None
-    notes: list[str] = []
+    notes: list[str] = Field(default_factory=list)

@@ -55,8 +55,7 @@
       }
       .content-preview {
         font-size: 0.95rem;
-        max-height: 9rem;
-        overflow: auto;
+        white-space: pre-wrap;
       }
       .control-grid {
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -334,6 +333,25 @@
         return opt;
       }
 
+      function escapeHtml(str = "") {
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function renderParsedSections(sections = []) {
+        if (!sections.length) return "";
+        return sections
+          .map(
+            (section) =>
+              `<p>${escapeHtml(section.content).replace(/\n/g, "<br>")}</p>`
+          )
+          .join("<hr />");
+      }
+
       function updateSelects(games) {
         const gameOptions = games.map((g) => ({ value: g.id, text: `${g.title} (#${g.id})` }));
         Object.values(selects)
@@ -421,7 +439,7 @@
                         ${guide.parsed_content?.length ? '<span class="badge-main" style="background:#eefbf0;color:#1c6b2a;border-color:#c1e7c5">Parsed</span>' : ""}
                         <div class="notes">${guide.url || "No URL"}</div>
                         ${guide.parsed_content?.length
-                          ? `<div class="content-preview muted-bg">${guide.parsed_content[0].content.slice(0, 280)}${guide.parsed_content[0].content.length > 280 ? "..." : ""}</div>`
+                          ? `<div class="content-preview muted-bg">${renderParsedSections(guide.parsed_content)}</div>`
                           : '<div class="secondary-text">Awaiting parsing.</div>'}
                       </li>
                     `)
@@ -518,6 +536,7 @@
               result.created_game ? "created" : null,
               result.achievements_added ? `${result.achievements_added} achievements` : null,
               result.guides_added ? `${result.guides_added} guides` : null,
+              result.guides_parsed ? `${result.guides_parsed} parsed` : null,
             ]
               .filter(Boolean)
               .join(" | ");

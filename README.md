@@ -16,24 +16,40 @@ records.
 - Engagement scoring with error notes surfaced in the UI
 
 ## Getting started
-1. Copy the sample environment and fill in the credentials you have:
+1. Use Python 3.9–3.13 (3.12 is the tested baseline). Python 3.14 is currently **unsupported**
+   because `pydantic-core` (pulled in by FastAPI) fails to build against CPython 3.14 due to
+   removed `PyUnicode_*` APIs. If you see build errors mentioning `PyUnicode_New` or `PyUnicode_KIND`,
+   switch to Python 3.12/3.13 before installing dependencies.
+2. Copy the sample environment and fill in the credentials you have:
    ```bash
    cp .env.example .env
    # then edit .env to set API keys, throttling intervals, and database URL
    ```
-2. Install dependencies:
+3. Install dependencies (SQLite is the default and requires no extra drivers):
    ```bash
    pip install -r requirements.txt
    ```
-3. Configure the database URL (defaults to SQLite) if you need something different:
+4. Configure the database URL (defaults to SQLite) if you need something different:
    ```bash
    export DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/game_db"
    ```
-4. Run the API server:
+   If you want to use PostgreSQL, install a driver separately depending on your URL scheme:
    ```bash
-   uvicorn app.main:app --reload
+   # Async PostgreSQL (matches the example URL above)
+   pip install "asyncpg>=0.30"  # compiled wheels are available for recent Python versions
+
+   # Alternative async driver backed by psycopg 3
+   pip install "psycopg[binary]>=3.2"
+   export DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/game_db"
    ```
-5. Open the interactive docs at `http://127.0.0.1:8000/docs` and use the `/api/*` routes to add
+5. Run the API server:
+   ```bash
+   # Using the Python launcher avoids PATH issues when uvicorn is installed in a user site-packages directory
+   python -m uvicorn app.main:app --reload
+   ```
+   If you prefer to call `uvicorn` directly, ensure your Python Scripts directory (for example
+   `%APPDATA%\Python\Python311\Scripts` on Windows or `~/.local/bin` on Linux/macOS) is on your `PATH`.
+6. Open the interactive docs at `http://127.0.0.1:8000/docs` and use the `/api/*` routes to add
    data. The landing page at `/` renders an interactive dashboard that can call the APIs directly.
 
 ## Steam API configuration
@@ -43,9 +59,10 @@ To import achievements and guides directly from the Steam Web API, provide a Ste
 ```
 STEAM_API_KEY=your_api_key
 STEAM_REQUEST_INTERVAL=0.35  # optional delay between Steam API calls
+STEAM_GUIDE_SEARCH_TEXT=achievement  # optional search text to narrow guides
 ```
 
-Use the `/api/steam/import` endpoint with a comma or newline separated list of app IDs to batch import games, achievements, and guide metadata.
+Use the `/api/steam/import` endpoint with a comma or newline separated list of app IDs to batch import games, achievements, and guide metadata. The importer will filter guides using the search text (default: `achievement`) and automatically parse the first matching guide's content into the database for downstream analysis, returning `guides_parsed` in the response to confirm parsing.
 
 ## Analysis pipeline
 
@@ -57,6 +74,7 @@ export OPENAI_MODEL=gpt-4o-mini             # optional
 export OPENAI_REQUEST_INTERVAL=2.0          # optional delay between OpenAI calls
 export GUIDE_REQUEST_INTERVAL=1.0           # optional delay between guide fetches
 export HLTB_REQUEST_INTERVAL=1.2            # optional delay between HLTB searches
+# Tested with `openai` >= 2.8.1; the analyzer now uses Chat Completions for compatibility.
 ```
 
 2. Trigger the analysis for a game by calling `POST /api/games/{id}/analyze`.

@@ -34,25 +34,28 @@ def engagement_score_formula(t_hours: float, completion_percent: float) -> float
 async def _parse_guides_for_game(
     session: AsyncSession, game: models.Game, settings: Settings
 ) -> tuple[list[str], list[str]]:
-    parser = GuideParser(request_interval=settings.guide_request_interval)
+    parser = GuideParser(
+        request_interval=settings.guide_request_interval,
+        steam_api_key=settings.steam_api_key,
+    )
     parsed_texts: list[str] = []
     notes: list[str] = []
     try:
-        for guide in game.guides:
-            if not guide.url:
-                continue
-            if guide.parsed_content:
-                parsed_texts.extend([content.content for content in guide.parsed_content])
-                continue
+        first_guide = next((g for g in game.guides if g.url), None)
+        if not first_guide:
+            return parsed_texts, notes
+
+        if first_guide.parsed_content:
+            parsed_texts.extend([content.content for content in first_guide.parsed_content])
+        else:
             await asyncio.sleep(settings.guide_request_interval)
             try:
-                text, sections = await parser.fetch_and_parse(guide.url)
+                text, sections = await parser.fetch_and_parse(first_guide.url)
             except GuideParserError as exc:
-                notes.append(f"Guide '{guide.title}' failed: {exc}")
-                continue
+                notes.append(f"Guide '{first_guide.title}' failed: {exc}")
             else:
                 parsed = models.ParsedGuideContent(
-                    guide_id=guide.id, content=text, section_count=sections
+                    guide_id=first_guide.id, content=text, section_count=sections
                 )
                 session.add(parsed)
                 parsed_texts.append(text)
