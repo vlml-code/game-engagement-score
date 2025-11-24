@@ -112,16 +112,34 @@ class SteamService:
         await self._throttle()
         url = "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/"
         # Steam Web API uses filetype 10 for "All Guides" (per IPublishedFileService docs).
-        # Some games only respond to the broader web guide type (11), so retry once with that
-        # variant if the initial query is empty.
+        # Some games only respond to the broader web guide type (11), and others may omit the
+        # Guide tag entirely. Try a few variants to maximise coverage.
         request_variants = [
             {
-                "filetype": 10,  # k_PFI_MatchingFileType_AllGuides
-                "requiredtags[0]": "Guide",
+                "label": "all_guides_tagged",
+                "params": {
+                    "filetype": 10,  # k_PFI_MatchingFileType_AllGuides
+                    "requiredtags[0]": "Guide",
+                },
             },
             {
-                "filetype": 11,  # k_PFI_MatchingFileType_WebGuides
-                "requiredtags[0]": "Guide",
+                "label": "all_guides_untagged",
+                "params": {
+                    "filetype": 10,
+                },
+            },
+            {
+                "label": "web_guides_tagged",
+                "params": {
+                    "filetype": 11,  # k_PFI_MatchingFileType_WebGuides
+                    "requiredtags[0]": "Guide",
+                },
+            },
+            {
+                "label": "web_guides_untagged",
+                "params": {
+                    "filetype": 11,
+                },
             },
         ]
 
@@ -138,7 +156,7 @@ class SteamService:
                 "numperpage": 50,
                 "return_vote_data": True,
                 "strip_description_bbcode": True,
-                **variant,
+                **variant["params"],
             }
             response = await self._client.get(url, params=params)
             if response.status_code >= 400:
@@ -155,6 +173,7 @@ class SteamService:
                     "app_id": app_id,
                     "result_count": data.get("response", {}).get("resultcount"),
                     "file_count": len(files),
+                    "variant": variant["label"],
                     "params": params,
                 },
             )
