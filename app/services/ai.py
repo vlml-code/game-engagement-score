@@ -88,7 +88,7 @@ class AchievementAI:
         )
 
         try:
-            response = await self.client.responses.create(**request_payload)
+            response = await self.client.responses.create_and_poll(**request_payload)
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
 
@@ -97,6 +97,10 @@ class AchievementAI:
             "Received OpenAI response for main-story detection: %s",
             json.dumps(response_payload, ensure_ascii=False),
         )
+
+        status = getattr(response, "status", None)
+        if status and status != "completed":
+            logger.warning("OpenAI response not completed (status=%s)", status)
 
         def _extract_output_text(resp: object) -> str:
             if resp is None:
