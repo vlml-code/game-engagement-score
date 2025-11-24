@@ -16,16 +16,27 @@ records.
 - Engagement scoring with error notes surfaced in the UI
 
 ## Getting started
-1. Copy the sample environment and fill in the credentials you have:
+1. Make sure you are running Python 3.9–3.13. Python 3.14 can work, but `pydantic-core` needs a
+   manual flag while wheels catch up:
+   ```bash
+   # Linux/macOS
+   export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
+
+   # Windows (PowerShell)
+   $env:PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
+   ```
+   If you prefer to avoid the native build, install with Python 3.12 (the version the project is
+   tested against).
+2. Copy the sample environment and fill in the credentials you have:
    ```bash
    cp .env.example .env
    # then edit .env to set API keys, throttling intervals, and database URL
    ```
-2. Install dependencies (SQLite is the default and requires no extra drivers):
+3. Install dependencies (SQLite is the default and requires no extra drivers):
    ```bash
    pip install -r requirements.txt
    ```
-3. Configure the database URL (defaults to SQLite) if you need something different:
+4. Configure the database URL (defaults to SQLite) if you need something different:
    ```bash
    export DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/game_db"
    ```
@@ -38,14 +49,14 @@ records.
    pip install "psycopg[binary]>=3.2"
    export DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/game_db"
    ```
-4. Run the API server:
+5. Run the API server:
    ```bash
    # Using the Python launcher avoids PATH issues when uvicorn is installed in a user site-packages directory
    python -m uvicorn app.main:app --reload
    ```
    If you prefer to call `uvicorn` directly, ensure your Python Scripts directory (for example
    `%APPDATA%\Python\Python311\Scripts` on Windows or `~/.local/bin` on Linux/macOS) is on your `PATH`.
-5. Open the interactive docs at `http://127.0.0.1:8000/docs` and use the `/api/*` routes to add
+6. Open the interactive docs at `http://127.0.0.1:8000/docs` and use the `/api/*` routes to add
    data. The landing page at `/` renders an interactive dashboard that can call the APIs directly.
 
 ## Steam API configuration
