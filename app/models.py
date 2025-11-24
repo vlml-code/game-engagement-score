@@ -10,6 +10,7 @@ class Game(Base):
     __tablename__ = "games"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    steam_app_id: Mapped[int | None] = mapped_column(Integer, unique=True, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     genre: Mapped[str | None] = mapped_column(String(120))
     platform: Mapped[str | None] = mapped_column(String(120))

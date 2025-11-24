@@ -27,6 +27,17 @@ records.
 4. Open the interactive docs at `http://127.0.0.1:8000/docs` and use the `/api/*` routes to add
    data. The landing page at `/` renders a simple dashboard of stored games.
 
+## Steam API configuration
+
+To import achievements and guides directly from the Steam Web API, provide a Steam API key via an environment variable or `.env` file:
+
+```
+STEAM_API_KEY=your_api_key
+STEAM_REQUEST_INTERVAL=0.35  # optional delay between Steam API calls
+```
+
+Use the `/api/steam/import` endpoint with a comma or newline separated list of app IDs to batch import games, achievements, and guide metadata.
+
 ## Data model
 The app tracks:
 - **Game**: core metadata such as title, genre, and platform.
