@@ -26,6 +26,13 @@ async def list_games(session: AsyncSession) -> list[models.Game]:
     return result.scalars().unique().all()
 
 
+async def list_games_without_engagement_scores(
+    session: AsyncSession,
+) -> list[models.Game]:
+    games = await list_games(session)
+    return [game for game in games if not game.engagement_scores]
+
+
 async def get_game_by_steam_app_id(
     session: AsyncSession, steam_app_id: int
 ) -> models.Game | None:

@@ -1,7 +1,12 @@
 import asyncio
-from typing import Iterable
+import json
+import logging
+from typing import Iterable, Sequence
 
 from openai import AsyncOpenAI, OpenAIError
+
+
+logger = logging.getLogger(__name__)
 
 
 class AchievementAIError(Exception):
@@ -65,25 +70,85 @@ class AchievementAI:
             user_sections.append(guide_text)
         user_prompt = "\n\n".join(user_sections)
 
+        input_messages = [
+            {"role": "developer", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        request_payload = {
+            "model": self.model,
+            "reasoning": {"effort": "low"},
+            "input": input_messages,
+            "temperature": 1,
+            "max_output_tokens": 200,
+        }
+        logger.info(
+            "Sending OpenAI request for main-story detection: %s",
+            json.dumps(request_payload, ensure_ascii=False),
+        )
+
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0,
-                # Some newer models reject `max_tokens`; use `max_completion_tokens` instead.
-                max_completion_tokens=20,
-            )
+            response = await self.client.responses.create(**request_payload)
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
 
-        content = ""
-        if response.choices:
-            content = response.choices[0].message.content or ""
-        content = content.strip()
+        async def _poll_response(resp) -> object:
+            status = getattr(resp, "status", None)
+            total_wait = 0.0
+            # Gracefully wait up to 10 seconds for completion
+            while status not in {"completed", None} and total_wait < 10.0:
+                await asyncio.sleep(1.0)
+                total_wait += 1.0
+                try:
+                    resp = await self.client.responses.retrieve(resp.id)
+                except OpenAIError as exc:  # pragma: no cover - network/remote errors
+                    raise AchievementAIError(f"OpenAI poll failed: {exc}") from exc
+                status = getattr(resp, "status", None)
+                logger.info("Polling OpenAI response (status=%s, waited=%.1fs)", status, total_wait)
+            return resp
+
+        response = await _poll_response(response)
+
+        response_payload = response.model_dump()
+        logger.info(
+            "Received OpenAI response for main-story detection: %s",
+            json.dumps(response_payload, ensure_ascii=False),
+        )
+
+        status = getattr(response, "status", None)
+        if status and status != "completed":
+            logger.warning("OpenAI response not completed after wait (status=%s)", status)
+
+        def _extract_output_text(resp: object) -> str:
+            if resp is None:
+                return ""
+
+            output_text = getattr(resp, "output_text", None)
+            if isinstance(output_text, str):
+                return output_text
+
+            output = getattr(resp, "output", None)
+            if isinstance(output, Sequence):
+                chunks: list[str] = []
+                for item in output:
+                    if not isinstance(item, dict):
+                        continue
+                    content_blocks = item.get("content")
+                    if isinstance(content_blocks, Sequence):
+                        for block in content_blocks:
+                            if not isinstance(block, dict):
+                                continue
+                            text = block.get("text") or block.get("output_text") or ""
+                            chunks.append(str(text))
+                return "".join(chunks)
+            return ""
+
+        content = _extract_output_text(response).strip()
         if not content:
+            logger.warning(
+                "OpenAI response missing content (status=%s)",
+                getattr(response, "status", "<unknown>"),
+            )
             return None
 
         cleaned = content.splitlines()[0].strip('" ')

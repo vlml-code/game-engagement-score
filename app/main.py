@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -5,6 +7,11 @@ from fastapi.templating import Jinja2Templates
 
 from app import api, crud
 from app.db import get_session, init_db
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 
 app = FastAPI(title="Game Engagement Score")
 templates = Jinja2Templates(directory="app/templates")
