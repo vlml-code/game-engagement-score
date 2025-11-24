@@ -16,17 +16,10 @@ records.
 - Engagement scoring with error notes surfaced in the UI
 
 ## Getting started
-1. Make sure you are running Python 3.9–3.13. Python 3.14 can work, but `pydantic-core` needs a
-   manual flag while wheels catch up:
-   ```bash
-   # Linux/macOS
-   export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
-
-   # Windows (PowerShell)
-   $env:PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
-   ```
-   If you prefer to avoid the native build, install with Python 3.12 (the version the project is
-   tested against).
+1. Use Python 3.9–3.13 (3.12 is the tested baseline). Python 3.14 is currently **unsupported**
+   because `pydantic-core` (pulled in by FastAPI) fails to build against CPython 3.14 due to
+   removed `PyUnicode_*` APIs. If you see build errors mentioning `PyUnicode_New` or `PyUnicode_KIND`,
+   switch to Python 3.12/3.13 before installing dependencies.
 2. Copy the sample environment and fill in the credentials you have:
    ```bash
    cp .env.example .env

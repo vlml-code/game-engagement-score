@@ -2,6 +2,7 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.3
 SQLAlchemy==2.0.32
 aiosqlite==0.20.0
+# Requires Python <3.14; pydantic-core does not yet support CPython 3.14.
 pydantic==2.10.6
 jinja2==3.1.4
 httpx==0.27.2
