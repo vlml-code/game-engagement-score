@@ -40,8 +40,11 @@ records.
    ```
 4. Run the API server:
    ```bash
-   uvicorn app.main:app --reload
+   # Using the Python launcher avoids PATH issues when uvicorn is installed in a user site-packages directory
+   python -m uvicorn app.main:app --reload
    ```
+   If you prefer to call `uvicorn` directly, ensure your Python Scripts directory (for example
+   `%APPDATA%\Python\Python311\Scripts` on Windows or `~/.local/bin` on Linux/macOS) is on your `PATH`.
 5. Open the interactive docs at `http://127.0.0.1:8000/docs` and use the `/api/*` routes to add
    data. The landing page at `/` renders an interactive dashboard that can call the APIs directly.
 
