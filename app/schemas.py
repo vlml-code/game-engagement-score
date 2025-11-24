@@ -163,6 +163,7 @@ class SteamImportResult(ORMBase):
     created_game: bool = False
     achievements_added: int = 0
     guides_added: int = 0
+    guides_parsed: int = 0
     status: str
     error: Optional[str] = None
 

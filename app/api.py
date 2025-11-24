@@ -251,6 +251,7 @@ async def import_from_steam(
             created_game = False
             achievements_added = 0
             guides_added = 0
+            guides_parsed = 0
             status_message = "ok"
             error_message: str | None = None
 
@@ -306,6 +307,7 @@ async def import_from_steam(
                                     content=text,
                                     section_count=sections,
                                 )
+                                guides_parsed = 1
                             except GuideParserError as exc:
                                 status_message = "partial"
                                 error_message = str(exc)
@@ -320,6 +322,7 @@ async def import_from_steam(
                     created_game=created_game,
                     achievements_added=achievements_added,
                     guides_added=guides_added,
+                    guides_parsed=guides_parsed,
                     status=status_message,
                     error=error_message,
                 )

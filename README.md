@@ -62,7 +62,7 @@ STEAM_REQUEST_INTERVAL=0.35  # optional delay between Steam API calls
 STEAM_GUIDE_SEARCH_TEXT=achievement  # optional search text to narrow guides
 ```
 
-Use the `/api/steam/import` endpoint with a comma or newline separated list of app IDs to batch import games, achievements, and guide metadata. The importer will filter guides using the search text (default: `achievement`) and automatically parse the first matching guide's content into the database for downstream analysis.
+Use the `/api/steam/import` endpoint with a comma or newline separated list of app IDs to batch import games, achievements, and guide metadata. The importer will filter guides using the search text (default: `achievement`) and automatically parse the first matching guide's content into the database for downstream analysis, returning `guides_parsed` in the response to confirm parsing.
 
 ## Analysis pipeline
 
