@@ -74,6 +74,7 @@ export OPENAI_MODEL=gpt-4o-mini             # optional
 export OPENAI_REQUEST_INTERVAL=2.0          # optional delay between OpenAI calls
 export GUIDE_REQUEST_INTERVAL=1.0           # optional delay between guide fetches
 export HLTB_REQUEST_INTERVAL=1.2            # optional delay between HLTB searches
+# Requires `openai` >= 2.8.1 for the Responses API used by the analyzer.
 ```
 
 2. Trigger the analysis for a game by calling `POST /api/games/{id}/analyze`.

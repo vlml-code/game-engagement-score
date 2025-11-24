@@ -18,6 +18,10 @@ class AchievementAI:
         if not api_key:
             raise AchievementAIError("OpenAI API key is not configured")
         self.client = AsyncOpenAI(api_key=api_key)
+        if not hasattr(self.client, "responses"):
+            raise AchievementAIError(
+                "OpenAI client does not support the Responses API; please upgrade 'openai' to >=2.8.1"
+            )
         self.model = model
         self.request_interval = max(request_interval, 0)
         self._last_request = 0.0
@@ -84,16 +88,15 @@ class AchievementAI:
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
 
-        if not response.output:
-            return None
-
-        text_chunks = []
-        for item in response.output:
-            for block in getattr(item, "content", []):
-                text = getattr(block, "text", None)
-                if text:
-                    text_chunks.append(text)
-        content = "\n".join(text_chunks).strip()
+        content = getattr(response, "output_text", None) or ""
+        if not content:
+            text_chunks = []
+            for item in getattr(response, "output", []) or []:
+                for block in getattr(item, "content", []) or []:
+                    text = getattr(block, "text", None)
+                    if text:
+                        text_chunks.append(text)
+            content = "\n".join(text_chunks).strip()
         if not content:
             return None
 
