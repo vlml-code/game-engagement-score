@@ -1,7 +1,11 @@
 import asyncio
+import logging
 from typing import Iterable
 
 from openai import AsyncOpenAI, OpenAIError
+
+
+logger = logging.getLogger(__name__)
 
 
 class AchievementAIError(Exception):
@@ -65,19 +69,38 @@ class AchievementAI:
             user_sections.append(guide_text)
         user_prompt = "\n\n".join(user_sections)
 
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        logger.info(
+            "Sending OpenAI request for main-story detection",
+            extra={
+                "openai_request": {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": 1,
+                    "max_completion_tokens": 200,
+                }
+            },
+        )
+
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0,
+                messages=messages,
+                temperature=1,
                 # Some newer models reject `max_tokens`; use `max_completion_tokens` instead.
-                max_completion_tokens=20,
+                max_completion_tokens=200,
             )
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
+
+        logger.info(
+            "Received OpenAI response for main-story detection",
+            extra={"openai_response": response.model_dump()}
+        )
 
         content = ""
         if response.choices:
