@@ -518,6 +518,7 @@
               result.created_game ? "created" : null,
               result.achievements_added ? `${result.achievements_added} achievements` : null,
               result.guides_added ? `${result.guides_added} guides` : null,
+              result.guides_parsed ? `${result.guides_parsed} parsed` : null,
             ]
               .filter(Boolean)
               .join(" | ");

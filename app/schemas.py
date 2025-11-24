@@ -55,6 +55,7 @@ class GuideRead(GuideBase):
     id: int
     game_id: int
     created_at: datetime
+    parsed_content: list[ParsedGuideContentRead] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
