@@ -7,7 +7,7 @@ from app import models, schemas
 
 
 async def create_game(session: AsyncSession, game_in: schemas.GameCreate) -> models.Game:
-    game = models.Game(**game_in.dict())
+    game = models.Game(**game_in.model_dump())
     session.add(game)
     await session.commit()
     await session.refresh(game)
@@ -52,7 +52,7 @@ async def get_game(session: AsyncSession, game_id: int) -> models.Game | None:
 async def update_game(
     session: AsyncSession, game: models.Game, game_in: schemas.GameUpdate
 ) -> models.Game:
-    for key, value in game_in.dict(exclude_unset=True).items():
+    for key, value in game_in.model_dump(exclude_unset=True).items():
         setattr(game, key, value)
     await session.commit()
     await session.refresh(game)
@@ -164,7 +164,7 @@ async def get_related(
 async def update_related(
     session: AsyncSession, instance: models.Base, payload: BaseModel
 ) -> models.Base:
-    for key, value in payload.dict(exclude_unset=True).items():
+    for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(instance, key, value)
     await session.commit()
     await session.refresh(instance)

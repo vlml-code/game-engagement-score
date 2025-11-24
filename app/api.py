@@ -58,7 +58,9 @@ async def create_achievement(
     achievement_in: schemas.AchievementCreate, session: AsyncSession = Depends(get_session)
 ):
     await _get_related_or_404(session, models.Game, achievement_in.game_id)
-    created = await crud.create_related(session, models.Achievement, achievement_in.dict())
+    created = await crud.create_related(
+        session, models.Achievement, achievement_in.model_dump()
+    )
     return created
 
 
@@ -92,7 +94,7 @@ async def delete_achievement(achievement_id: int, session: AsyncSession = Depend
 @router.post("/guides", response_model=schemas.GuideRead, status_code=status.HTTP_201_CREATED)
 async def create_guide(guide_in: schemas.GuideCreate, session: AsyncSession = Depends(get_session)):
     await _get_related_or_404(session, models.Game, guide_in.game_id)
-    return await crud.create_related(session, models.Guide, guide_in.dict())
+    return await crud.create_related(session, models.Guide, guide_in.model_dump())
 
 
 @router.get("/guides", response_model=list[schemas.GuideRead])
@@ -127,7 +129,9 @@ async def create_parsed_content(
     parsed_in: schemas.ParsedGuideContentCreate, session: AsyncSession = Depends(get_session)
 ):
     await _get_related_or_404(session, models.Guide, parsed_in.guide_id)
-    return await crud.create_related(session, models.ParsedGuideContent, parsed_in.dict())
+    return await crud.create_related(
+        session, models.ParsedGuideContent, parsed_in.model_dump()
+    )
 
 
 @router.get("/parsed-content", response_model=list[schemas.ParsedGuideContentRead])
@@ -159,7 +163,7 @@ async def delete_parsed_content(content_id: int, session: AsyncSession = Depends
 @router.post("/hltb-times", response_model=schemas.HLTBTimeRead, status_code=status.HTTP_201_CREATED)
 async def create_hltb_time(time_in: schemas.HLTBTimeCreate, session: AsyncSession = Depends(get_session)):
     await _get_related_or_404(session, models.Game, time_in.game_id)
-    return await crud.create_related(session, models.HLTBTime, time_in.dict())
+    return await crud.create_related(session, models.HLTBTime, time_in.model_dump())
 
 
 @router.get("/hltb-times", response_model=list[schemas.HLTBTimeRead])
@@ -195,7 +199,9 @@ async def create_engagement_score(
     score_in: schemas.EngagementScoreCreate, session: AsyncSession = Depends(get_session)
 ):
     await _get_related_or_404(session, models.Game, score_in.game_id)
-    return await crud.create_related(session, models.EngagementScore, score_in.dict())
+    return await crud.create_related(
+        session, models.EngagementScore, score_in.model_dump()
+    )
 
 
 @router.get("/engagement-scores", response_model=list[schemas.EngagementScoreRead])
