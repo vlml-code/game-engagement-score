@@ -88,9 +88,26 @@ class AchievementAI:
         )
 
         try:
-            response = await self.client.responses.create_and_poll(**request_payload)
+            response = await self.client.responses.create(**request_payload)
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
+
+        async def _poll_response(resp) -> object:
+            status = getattr(resp, "status", None)
+            total_wait = 0.0
+            # Gracefully wait up to 10 seconds for completion
+            while status not in {"completed", None} and total_wait < 10.0:
+                await asyncio.sleep(1.0)
+                total_wait += 1.0
+                try:
+                    resp = await self.client.responses.retrieve(resp.id)
+                except OpenAIError as exc:  # pragma: no cover - network/remote errors
+                    raise AchievementAIError(f"OpenAI poll failed: {exc}") from exc
+                status = getattr(resp, "status", None)
+                logger.info("Polling OpenAI response (status=%s, waited=%.1fs)", status, total_wait)
+            return resp
+
+        response = await _poll_response(response)
 
         response_payload = response.model_dump()
         logger.info(
@@ -100,7 +117,7 @@ class AchievementAI:
 
         status = getattr(response, "status", None)
         if status and status != "completed":
-            logger.warning("OpenAI response not completed (status=%s)", status)
+            logger.warning("OpenAI response not completed after wait (status=%s)", status)
 
         def _extract_output_text(resp: object) -> str:
             if resp is None:
