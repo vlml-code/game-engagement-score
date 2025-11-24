@@ -34,7 +34,10 @@ def engagement_score_formula(t_hours: float, completion_percent: float) -> float
 async def _parse_guides_for_game(
     session: AsyncSession, game: models.Game, settings: Settings
 ) -> tuple[list[str], list[str]]:
-    parser = GuideParser(request_interval=settings.guide_request_interval)
+    parser = GuideParser(
+        request_interval=settings.guide_request_interval,
+        steam_api_key=settings.steam_api_key,
+    )
     parsed_texts: list[str] = []
     notes: list[str] = []
     try:
