@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from typing import Iterable
 
@@ -74,16 +75,15 @@ class AchievementAI:
             {"role": "user", "content": user_prompt},
         ]
 
+        request_payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 1,
+            "max_completion_tokens": 200,
+        }
         logger.info(
-            "Sending OpenAI request for main-story detection",
-            extra={
-                "openai_request": {
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": 1,
-                    "max_completion_tokens": 200,
-                }
-            },
+            "Sending OpenAI request for main-story detection: %s",
+            json.dumps(request_payload, ensure_ascii=False),
         )
 
         try:
@@ -97,9 +97,10 @@ class AchievementAI:
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
 
+        response_payload = response.model_dump()
         logger.info(
-            "Received OpenAI response for main-story detection",
-            extra={"openai_response": response.model_dump()}
+            "Received OpenAI response for main-story detection: %s",
+            json.dumps(response_payload, ensure_ascii=False),
         )
 
         content = ""
