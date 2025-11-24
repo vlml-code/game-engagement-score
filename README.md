@@ -21,13 +21,22 @@ records.
    cp .env.example .env
    # then edit .env to set API keys, throttling intervals, and database URL
    ```
-2. Install dependencies:
+2. Install dependencies (SQLite is the default and requires no extra drivers):
    ```bash
    pip install -r requirements.txt
    ```
 3. Configure the database URL (defaults to SQLite) if you need something different:
    ```bash
    export DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/game_db"
+   ```
+   If you want to use PostgreSQL, install a driver separately depending on your URL scheme:
+   ```bash
+   # Async PostgreSQL (matches the example URL above)
+   pip install "asyncpg>=0.30"  # compiled wheels are available for recent Python versions
+
+   # Alternative async driver backed by psycopg 3
+   pip install "psycopg[binary]>=3.2"
+   export DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/game_db"
    ```
 4. Run the API server:
    ```bash
