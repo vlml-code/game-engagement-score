@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from openai import AsyncOpenAI, OpenAIError
 
@@ -103,11 +103,28 @@ class AchievementAI:
             json.dumps(response_payload, ensure_ascii=False),
         )
 
+        def _extract_content(message_content: str | Sequence[dict] | None) -> str:
+            if isinstance(message_content, str):
+                return message_content
+            if isinstance(message_content, Sequence):
+                parts: list[str] = []
+                for item in message_content:
+                    if isinstance(item, dict):
+                        text = item.get("text") or ""
+                        parts.append(str(text))
+                return "".join(parts)
+            return ""
+
         content = ""
         if response.choices:
-            content = response.choices[0].message.content or ""
+            content = _extract_content(response.choices[0].message.content)
+
         content = content.strip()
         if not content:
+            logger.warning(
+                "OpenAI response missing content (finish_reason=%s)",
+                response.choices[0].finish_reason if response.choices else "<none>",
+            )
             return None
 
         cleaned = content.splitlines()[0].strip('" ')
