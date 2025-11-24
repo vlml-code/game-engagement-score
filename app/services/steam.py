@@ -1,9 +1,12 @@
 import asyncio
+import logging
 import time
 from datetime import datetime
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class SteamServiceError(Exception):
@@ -113,8 +116,11 @@ class SteamService:
             "appid": app_id,
             "page": 1,
             "return_short_description": True,
-            "numperpage": 20,
-            "requiredtags[0]": "guides",
+            "numperpage": 50,
+            "requiredtags[0]": "Guide",
+            "filetype": 9,  # community guides
+            "return_vote_data": True,
+            "strip_description_bbcode": True,
         }
         response = await self._client.get(url, params=params)
         if response.status_code >= 400:
@@ -124,6 +130,15 @@ class SteamService:
 
         data = response.json()
         files = data.get("response", {}).get("publishedfiledetails", [])
+        logger.info(
+            "Steam guides response received",
+            extra={
+                "app_id": app_id,
+                "result_count": data.get("response", {}).get("resultcount"),
+                "file_count": len(files),
+                "params": params,
+            },
+        )
         guides: list[dict[str, Any]] = []
 
         for guide in files:
@@ -147,6 +162,17 @@ class SteamService:
             )
 
         if not guides:
-            raise SteamServiceError(f"No guides returned for app {app_id}")
+            first_file = files[0] if files else None
+            logger.warning(
+                "No guides parsed from Steam response",
+                extra={
+                    "app_id": app_id,
+                    "file_count": len(files),
+                    "first_file_keys": list(first_file.keys()) if isinstance(first_file, dict) else None,
+                },
+            )
+            raise SteamServiceError(
+                f"No guides returned for app {app_id}; request params {params}"
+            )
 
         return guides

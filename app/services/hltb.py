@@ -1,7 +1,10 @@
 import asyncio
+import logging
 from typing import Any
 
 from howlongtobeatpy import HowLongToBeat
+
+logger = logging.getLogger(__name__)
 
 
 class HLTBServiceError(Exception):
@@ -27,15 +30,31 @@ class HLTBService:
         await self._throttle()
         try:
             results: list[Any] | None = await asyncio.to_thread(
-                self._client.search, title
+                self._client.search, title, similarity_case_sensitive=False
             )
         except Exception as exc:  # pragma: no cover - third-party exceptions vary
             raise HLTBServiceError(f"HLTB search failed: {exc}") from exc
 
         if not results:
-            return None
+            logger.warning("HLTB search returned no results", extra={"title": title})
+            raise HLTBServiceError(
+                f"HowLongToBeat returned no matches for '{title}' (case-insensitive search)"
+            )
 
         best_match = max(results, key=lambda r: getattr(r, "similarity", 0))
+        logger.info(
+            "HLTB best match chosen",
+            extra={
+                "title": title,
+                "match_name": getattr(best_match, "game_name", None),
+                "similarity": getattr(best_match, "similarity", None),
+                "main_story_minutes": getattr(best_match, "main_story", None),
+            },
+        )
+
         if getattr(best_match, "main_story", None) is None:
-            return None
+            raise HLTBServiceError(
+                f"HowLongToBeat found '{getattr(best_match, 'game_name', None)}' but it lacks main-story time"
+            )
+
         return float(best_match.main_story) / 60.0 if best_match.main_story else None
