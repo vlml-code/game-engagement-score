@@ -8,20 +8,55 @@
     <style>
       body {
         padding: 2rem;
+        background: radial-gradient(circle at 10% 20%, #f4f7ff, #ffffff 35%);
       }
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1.5rem;
       }
       .pill {
         border-radius: 999px;
-        padding: 0.1rem 0.6rem;
+        padding: 0.2rem 0.75rem;
         background: var(--muted-border-color);
         font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
       }
       .secondary-text {
         color: var(--muted-color);
+      }
+      .badge-main {
+        background: #e8f4ff;
+        color: #0a4a8a;
+        border-radius: 999px;
+        padding: 0.15rem 0.6rem;
+        font-size: 0.8rem;
+        border: 1px solid #b9dcff;
+      }
+      .section {
+        margin-top: 1rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--muted-border-color);
+      }
+      .score {
+        font-weight: 700;
+        font-size: 1.2rem;
+      }
+      .muted-bg {
+        background: #f7f7fb;
+        padding: 0.75rem;
+        border-radius: 0.75rem;
+      }
+      .notes {
+        font-size: 0.95rem;
+        color: var(--muted-color);
+      }
+      .content-preview {
+        font-size: 0.95rem;
+        max-height: 9rem;
+        overflow: auto;
       }
     </style>
   </head>
@@ -30,10 +65,13 @@
       <header>
         <h1>Game Engagement Score</h1>
         <p class="secondary-text">
-          Minimal FastAPI + SQLAlchemy stack with tables for games, achievements, guides, parsed guide
-          content, HLTB time data, and engagement scores.
+          Import Steam apps, parse community guides, detect the main-story achievement with OpenAI,
+          fetch HowLongToBeat times, and compute engagement automatically.
         </p>
-        <a role="button" href="/docs" target="_blank">Open API docs</a>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap">
+          <a role="button" href="/docs" target="_blank">Open API docs</a>
+          <span class="pill">Analysis endpoint: POST /api/games/&lt;id&gt;/analyze</span>
+        </div>
       </header>
 
       <section>
@@ -43,17 +81,110 @@
         {% else %}
         <div class="grid">
           {% for game in games %}
+          {% set main_story = None %}
+          {% for ach in game.achievements %}
+          {% if ach.is_main_story_completion %}
+          {% set main_story = ach %}
+          {% endif %}
+          {% endfor %}
+          {% set latest_hltb = game.hltb_times[-1] if game.hltb_times else None %}
+          {% set latest_score = game.engagement_scores[-1] if game.engagement_scores else None %}
           <article>
             <header>
-              <h3>{{ game.title }}</h3>
-              <p class="secondary-text">
-                {{ game.genre or "Unknown genre" }} · {{ game.platform or "Unknown platform" }}
-              </p>
+              <div style="display: flex; justify-content: space-between; gap: 1rem">
+                <div>
+                  <h3>{{ game.title }}</h3>
+                  <p class="secondary-text">
+                    {{ game.genre or "Unknown genre" }} · {{ game.platform or "Unknown platform" }}
+                  </p>
+                </div>
+                <div style="text-align: right">
+                  <span class="pill" title="Steam App ID">🎮 {{ game.steam_app_id or "N/A" }}</span>
+                </div>
+              </div>
+              <p>{{ game.description or "No description available." }}</p>
             </header>
-            <p>{{ game.description or "No description available." }}</p>
-            <footer>
-              <span class="pill">Achievements: {{ game.achievements|length }}</span>
-              <span class="pill">Guides: {{ game.guides|length }}</span>
+
+            <div class="section">
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <h4>Achievements</h4>
+                <span class="pill">{{ game.achievements|length }} total</span>
+              </div>
+              {% if not game.achievements %}
+              <p class="secondary-text">No achievements imported yet.</p>
+              {% else %}
+              <ul>
+                {% for ach in game.achievements %}
+                <li>
+                  <strong>{{ ach.name }}</strong>
+                  {% if ach.is_main_story_completion %}<span class="badge-main">Main story</span>{% endif %}
+                  <br />
+                  <span class="secondary-text">{{ ach.description or "No description provided." }}</span>
+                  <div class="notes">
+                    {% if ach.completion_rate is not none %}
+                    Completion: {{ "%.2f"|format(ach.completion_rate) }}%
+                    {% else %}
+                    Completion data missing
+                    {% endif %}
+                  </div>
+                </li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </div>
+
+            <div class="section">
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <h4>Guides &amp; parsed content</h4>
+                <span class="pill">{{ game.guides|length }} guides</span>
+              </div>
+              {% if not game.guides %}
+              <p class="secondary-text">No guides discovered.</p>
+              {% else %}
+              <ul>
+                {% for guide in game.guides %}
+                <li>
+                  <strong>{{ guide.title }}</strong>
+                  {% if guide.parsed_content %}
+                  <span class="badge-main" style="background:#eefbf0;color:#1c6b2a;border-color:#c1e7c5">Parsed</span>
+                  {% endif %}
+                  <div class="notes">{{ guide.url or "No URL" }}</div>
+                  {% if guide.parsed_content %}
+                  <div class="content-preview muted-bg">
+                    {{ guide.parsed_content[0].content[:280] }}{% if guide.parsed_content[0].content|length > 280 %}...{% endif %}
+                  </div>
+                  {% else %}
+                  <div class="secondary-text">Awaiting parsing.</div>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </div>
+
+            <div class="section">
+              <h4>HowLongToBeat</h4>
+              {% if latest_hltb and latest_hltb.main_story_hours %}
+              <p class="score">⏱️ Main story: {{ "%.2f"|format(latest_hltb.main_story_hours) }} hours</p>
+              {% else %}
+              <p class="secondary-text">No main-story time recorded yet.</p>
+              {% endif %}
+            </div>
+
+            <div class="section">
+              <h4>Engagement score</h4>
+              {% if latest_score %}
+              <p class="score">⭐ {{ "%.1f"|format(latest_score.score) }}</p>
+              {% if latest_score.notes %}
+              <p class="notes">{{ latest_score.notes }}</p>
+              {% endif %}
+              {% else %}
+              <p class="secondary-text">Run the analysis endpoint to compute a score.</p>
+              {% endif %}
+            </div>
+
+            <footer style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top: 1rem">
+              <span class="pill">Guides parsed: {{ game.guides | selectattr("parsed_content") | list | length }}</span>
               <span class="pill">HLTB entries: {{ game.hltb_times|length }}</span>
               <span class="pill">Scores: {{ game.engagement_scores|length }}</span>
             </footer>

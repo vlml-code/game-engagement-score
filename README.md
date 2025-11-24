@@ -10,6 +10,10 @@ records.
   entries, and engagement scores
 - CRUD endpoints under `/api` for all entities
 - Pico.css-powered UI at `/` to preview games and relationships
+- OpenAI-powered detection of the main-story completion achievement
+- Guide HTML parsing to persist guide text for downstream prompts
+- HowLongToBeat lookup for main-story average time with throttling
+- Engagement scoring with error notes surfaced in the UI
 
 ## Getting started
 1. Install dependencies:
@@ -37,6 +41,27 @@ STEAM_REQUEST_INTERVAL=0.35  # optional delay between Steam API calls
 ```
 
 Use the `/api/steam/import` endpoint with a comma or newline separated list of app IDs to batch import games, achievements, and guide metadata.
+
+## Analysis pipeline
+
+1. Configure OpenAI and HowLongToBeat (optional but recommended):
+
+```bash
+export OPENAI_API_KEY=your_key_here
+export OPENAI_MODEL=gpt-4o-mini             # optional
+export OPENAI_REQUEST_INTERVAL=2.0          # optional delay between OpenAI calls
+export GUIDE_REQUEST_INTERVAL=1.0           # optional delay between guide fetches
+export HLTB_REQUEST_INTERVAL=1.2            # optional delay between HLTB searches
+```
+
+2. Trigger the analysis for a game by calling `POST /api/games/{id}/analyze`.
+
+The pipeline will:
+- Parse guide URLs and store their text.
+- Ask OpenAI to tag the main-story completion achievement using achievements and guide excerpts.
+- Fetch the main-story average time from HowLongToBeat.
+- Compute an engagement score using the provided formula and store notes when data is missing.
+- Display the latest results and any errors on the landing page.
 
 ## Data model
 The app tracks:
