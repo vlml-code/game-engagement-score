@@ -5,6 +5,7 @@ from app import crud, models, schemas
 from app.config import get_settings
 from app.db import get_session
 from app.services import pipeline
+from app.services.guides import GuideParser, GuideParserError
 from app.services.steam import SteamService, SteamServiceError
 
 router = APIRouter()
@@ -242,6 +243,7 @@ async def import_from_steam(
 
     results: list[schemas.SteamImportResult] = []
 
+    parser: GuideParser | None = None
     async with SteamService(
         api_key=settings.steam_api_key, request_interval=settings.steam_request_interval
     ) as steam:
@@ -281,8 +283,32 @@ async def import_from_steam(
             )
 
             try:
-                guides = await steam.fetch_guides(app_id)
+                guides = await steam.fetch_guides(
+                    app_id, search_text=settings.steam_guide_search_text
+                )
                 guides_added = await crud.add_guides(session, game.id, guides)
+                first_guide_url = guides[0]["url"] if guides else None
+                if first_guide_url:
+                    parser = parser or GuideParser(
+                        request_interval=settings.guide_request_interval
+                    )
+                    guide_row = await crud.get_guide_by_url(
+                        session, game.id, first_guide_url
+                    )
+                    if guide_row:
+                        has_parsed = await crud.has_parsed_content(session, guide_row.id)
+                        if not has_parsed:
+                            try:
+                                text, sections = await parser.fetch_and_parse(first_guide_url)
+                                await crud.add_parsed_content(
+                                    session,
+                                    guide_id=guide_row.id,
+                                    content=text,
+                                    section_count=sections,
+                                )
+                            except GuideParserError as exc:
+                                status_message = "partial"
+                                error_message = str(exc)
             except SteamServiceError as exc:
                 status_message = "partial"
                 error_message = str(exc)
@@ -298,6 +324,9 @@ async def import_from_steam(
                     error=error_message,
                 )
             )
+
+    if parser:
+        await parser.aclose()
 
     return schemas.SteamImportResponse(results=results)
 

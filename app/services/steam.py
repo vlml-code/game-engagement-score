@@ -108,7 +108,9 @@ class SteamService:
 
         return {"game_name": game_name, "achievements": parsed}
 
-    async def fetch_guides(self, app_id: int) -> list[dict[str, Any]]:
+    async def fetch_guides(
+        self, app_id: int, search_text: str | None = None
+    ) -> list[dict[str, Any]]:
         await self._throttle()
         url = "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/"
         # Steam Web API uses filetype 10 for "All Guides" (per IPublishedFileService docs).
@@ -156,6 +158,7 @@ class SteamService:
                 "numperpage": 50,
                 "return_vote_data": True,
                 "strip_description_bbcode": True,
+                **({"search_text": search_text} if search_text else {}),
                 **variant["params"],
             }
             response = await self._client.get(url, params=params)
@@ -182,6 +185,8 @@ class SteamService:
                 file_id = guide.get("publishedfileid")
                 title = guide.get("title")
                 if not file_id or not title:
+                    continue
+                if search_text and search_text.lower() not in title.lower():
                     continue
                 created_at = guide.get("time_created")
                 created = (

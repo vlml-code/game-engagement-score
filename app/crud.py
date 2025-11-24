@@ -144,6 +144,37 @@ async def add_guides(session: AsyncSession, game_id: int, guides: list[dict]) ->
     return len(new_rows)
 
 
+async def get_guide_by_url(
+    session: AsyncSession, game_id: int, url: str
+) -> models.Guide | None:
+    result = await session.execute(
+        select(models.Guide).where(
+            models.Guide.game_id == game_id, models.Guide.url == url
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def has_parsed_content(session: AsyncSession, guide_id: int) -> bool:
+    result = await session.execute(
+        select(models.ParsedGuideContent.id).where(
+            models.ParsedGuideContent.guide_id == guide_id
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def add_parsed_content(
+    session: AsyncSession, guide_id: int, content: str, section_count: int | None
+) -> models.ParsedGuideContent:
+    parsed = models.ParsedGuideContent(
+        guide_id=guide_id, content=content, section_count=section_count
+    )
+    session.add(parsed)
+    await session.commit()
+    return parsed
+
+
 async def list_related(
     session: AsyncSession, model_cls: type[models.Base], filter_field: str | None = None, value=None
 ) -> list[models.Base]:

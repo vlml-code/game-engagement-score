@@ -19,6 +19,11 @@ class Settings(BaseSettings):
         description="Delay in seconds between Steam API requests to avoid rate limits",
     )
 
+    steam_guide_search_text: str | None = Field(
+        default="achievement",
+        description="Optional search text to filter Steam guides (e.g., 'achievement')",
+    )
+
     guide_request_interval: float = Field(
         default=1.0,
         description="Delay between guide page fetches to reduce bot detection risk",
