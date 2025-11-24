@@ -35,6 +35,17 @@ class HLTBService:
         except Exception as exc:  # pragma: no cover - third-party exceptions vary
             raise HLTBServiceError(f"HLTB search failed: {exc}") from exc
 
+        logger.debug(
+            "HLTB raw search results",
+            extra={
+                "title": title,
+                "result_count": len(results) if results else 0,
+                "result_names": [getattr(r, "game_name", None) for r in results or []],
+                "result_similarities": [getattr(r, "similarity", None) for r in results or []],
+                "result_main_story": [getattr(r, "main_story", None) for r in results or []],
+            },
+        )
+
         if not results:
             logger.warning("HLTB search returned no results", extra={"title": title})
             raise HLTBServiceError(
@@ -48,7 +59,7 @@ class HLTBService:
                 "title": title,
                 "match_name": getattr(best_match, "game_name", None),
                 "similarity": getattr(best_match, "similarity", None),
-                "main_story_minutes": getattr(best_match, "main_story", None),
+                "main_story_hours_raw": getattr(best_match, "main_story", None),
             },
         )
 
@@ -57,4 +68,5 @@ class HLTBService:
                 f"HowLongToBeat found '{getattr(best_match, 'game_name', None)}' but it lacks main-story time"
             )
 
-        return float(best_match.main_story) / 60.0 if best_match.main_story else None
+        # howlongtobeatpy returns hours already; avoid re-scaling which produced incorrect values
+        return float(best_match.main_story)
