@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, models, schemas
+from app.config import get_settings
 from app.db import get_session
+from app.services.steam import SteamService, SteamServiceError
 
 router = APIRouter()
 
@@ -198,6 +200,99 @@ async def create_engagement_score(
 @router.get("/engagement-scores", response_model=list[schemas.EngagementScoreRead])
 async def read_engagement_scores(session: AsyncSession = Depends(get_session)):
     return await crud.list_related(session, models.EngagementScore)
+
+
+def _parse_app_ids(app_ids_text: str) -> list[int]:
+    tokens = [token.strip() for token in app_ids_text.replace("\n", ",").split(",")]
+    app_ids: list[int] = []
+    for token in tokens:
+        if not token:
+            continue
+        try:
+            app_ids.append(int(token))
+        except ValueError:
+            continue
+    return list(dict.fromkeys(app_ids))
+
+
+@router.post("/steam/import", response_model=schemas.SteamImportResponse)
+async def import_from_steam(
+    payload: schemas.SteamImportRequest, session: AsyncSession = Depends(get_session)
+):
+    settings = get_settings()
+    if not settings.steam_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Steam API key is not configured",
+        )
+
+    app_ids = _parse_app_ids(payload.app_ids_text)
+    if not app_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid Steam app IDs were provided",
+        )
+
+    results: list[schemas.SteamImportResult] = []
+
+    async with SteamService(
+        api_key=settings.steam_api_key, request_interval=settings.steam_request_interval
+    ) as steam:
+        for app_id in app_ids:
+            created_game = False
+            achievements_added = 0
+            guides_added = 0
+            status_message = "ok"
+            error_message: str | None = None
+
+            try:
+                schema = await steam.fetch_achievements(app_id)
+            except SteamServiceError as exc:
+                results.append(
+                    schemas.SteamImportResult(
+                        app_id=app_id,
+                        status="error",
+                        error=str(exc),
+                    )
+                )
+                continue
+
+            game = await crud.get_game_by_steam_app_id(session, app_id)
+            if not game:
+                game = await crud.create_game(
+                    session,
+                    schemas.GameCreate(
+                        title=schema.get("game_name") or f"App {app_id}",
+                        steam_app_id=app_id,
+                        description="Imported from Steam",
+                    ),
+                )
+                created_game = True
+
+            achievements_added = await crud.add_achievements(
+                session, game.id, schema.get("achievements", [])
+            )
+
+            try:
+                guides = await steam.fetch_guides(app_id)
+                guides_added = await crud.add_guides(session, game.id, guides)
+            except SteamServiceError as exc:
+                status_message = "partial"
+                error_message = str(exc)
+
+            results.append(
+                schemas.SteamImportResult(
+                    app_id=app_id,
+                    game_id=game.id,
+                    created_game=created_game,
+                    achievements_added=achievements_added,
+                    guides_added=guides_added,
+                    status=status_message,
+                    error=error_message,
+                )
+            )
+
+    return schemas.SteamImportResponse(results=results)
 
 
 @router.get("/engagement-scores/{score_id}", response_model=schemas.EngagementScoreRead)

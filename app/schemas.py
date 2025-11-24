@@ -118,6 +118,7 @@ class EngagementScoreRead(EngagementScoreBase):
 
 class GameBase(BaseModel):
     title: str
+    steam_app_id: Optional[int] = None
     genre: Optional[str] = None
     platform: Optional[str] = None
     release_date: Optional[str] = None
@@ -142,3 +143,23 @@ class GameRead(GameBase):
 
     class Config:
         orm_mode = True
+
+
+class SteamImportRequest(BaseModel):
+    app_ids_text: str = Field(
+        ..., description="Comma, whitespace, or newline-separated Steam app IDs"
+    )
+
+
+class SteamImportResult(BaseModel):
+    app_id: int
+    game_id: Optional[int] = None
+    created_game: bool = False
+    achievements_added: int = 0
+    guides_added: int = 0
+    status: str
+    error: Optional[str] = None
+
+
+class SteamImportResponse(BaseModel):
+    results: list[SteamImportResult]

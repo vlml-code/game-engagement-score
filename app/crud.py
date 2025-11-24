@@ -26,6 +26,15 @@ async def list_games(session: AsyncSession) -> list[models.Game]:
     return result.scalars().unique().all()
 
 
+async def get_game_by_steam_app_id(
+    session: AsyncSession, steam_app_id: int
+) -> models.Game | None:
+    result = await session.execute(
+        select(models.Game).where(models.Game.steam_app_id == steam_app_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_game(session: AsyncSession, game_id: int) -> models.Game | None:
     result = await session.execute(
         select(models.Game)
@@ -63,6 +72,64 @@ async def create_related(
     await session.commit()
     await session.refresh(instance)
     return instance
+
+
+async def add_achievements(
+    session: AsyncSession, game_id: int, achievements: list[dict]
+) -> int:
+    existing = await session.execute(
+        select(models.Achievement.name).where(models.Achievement.game_id == game_id)
+    )
+    existing_names = {name for (name,) in existing.all()}
+
+    new_rows: list[models.Achievement] = []
+    for achievement in achievements:
+        name = achievement.get("name")
+        if not name or name in existing_names:
+            continue
+        new_rows.append(
+            models.Achievement(
+                game_id=game_id,
+                name=name,
+                description=achievement.get("description"),
+                points=achievement.get("points"),
+            )
+        )
+    if not new_rows:
+        return 0
+
+    session.add_all(new_rows)
+    await session.commit()
+    return len(new_rows)
+
+
+async def add_guides(session: AsyncSession, game_id: int, guides: list[dict]) -> int:
+    existing = await session.execute(
+        select(models.Guide.url).where(models.Guide.game_id == game_id)
+    )
+    existing_urls = {url for (url,) in existing.all() if url}
+
+    new_rows: list[models.Guide] = []
+    for guide in guides:
+        url = guide.get("url")
+        if url in existing_urls:
+            continue
+        new_rows.append(
+            models.Guide(
+                game_id=game_id,
+                title=guide.get("title") or "Untitled Guide",
+                url=url,
+                author=guide.get("author"),
+                created_at=guide.get("created_at"),
+            )
+        )
+
+    if not new_rows:
+        return 0
+
+    session.add_all(new_rows)
+    await session.commit()
+    return len(new_rows)
 
 
 async def list_related(
