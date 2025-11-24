@@ -70,16 +70,17 @@ class AchievementAI:
             user_sections.append(guide_text)
         user_prompt = "\n\n".join(user_sections)
 
-        messages = [
-            {"role": "system", "content": system_prompt},
+        input_messages = [
+            {"role": "developer", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
 
         request_payload = {
             "model": self.model,
-            "messages": messages,
+            "reasoning": {"effort": "low"},
+            "input": input_messages,
             "temperature": 1,
-            "max_completion_tokens": 200,
+            "max_output_tokens": 200,
         }
         logger.info(
             "Sending OpenAI request for main-story detection: %s",
@@ -87,13 +88,7 @@ class AchievementAI:
         )
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=1,
-                # Some newer models reject `max_tokens`; use `max_completion_tokens` instead.
-                max_completion_tokens=200,
-            )
+            response = await self.client.responses.create(**request_payload)
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
 
@@ -103,27 +98,35 @@ class AchievementAI:
             json.dumps(response_payload, ensure_ascii=False),
         )
 
-        def _extract_content(message_content: str | Sequence[dict] | None) -> str:
-            if isinstance(message_content, str):
-                return message_content
-            if isinstance(message_content, Sequence):
-                parts: list[str] = []
-                for item in message_content:
-                    if isinstance(item, dict):
-                        text = item.get("text") or ""
-                        parts.append(str(text))
-                return "".join(parts)
+        def _extract_output_text(resp: object) -> str:
+            if resp is None:
+                return ""
+
+            output_text = getattr(resp, "output_text", None)
+            if isinstance(output_text, str):
+                return output_text
+
+            output = getattr(resp, "output", None)
+            if isinstance(output, Sequence):
+                chunks: list[str] = []
+                for item in output:
+                    if not isinstance(item, dict):
+                        continue
+                    content_blocks = item.get("content")
+                    if isinstance(content_blocks, Sequence):
+                        for block in content_blocks:
+                            if not isinstance(block, dict):
+                                continue
+                            text = block.get("text") or block.get("output_text") or ""
+                            chunks.append(str(text))
+                return "".join(chunks)
             return ""
 
-        content = ""
-        if response.choices:
-            content = _extract_content(response.choices[0].message.content)
-
-        content = content.strip()
+        content = _extract_output_text(response).strip()
         if not content:
             logger.warning(
-                "OpenAI response missing content (finish_reason=%s)",
-                response.choices[0].finish_reason if response.choices else "<none>",
+                "OpenAI response missing content (status=%s)",
+                getattr(response, "status", "<unknown>"),
             )
             return None
 
