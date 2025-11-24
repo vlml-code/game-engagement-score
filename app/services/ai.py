@@ -73,7 +73,8 @@ class AchievementAI:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0,
-                max_tokens=20,
+                # Some newer models reject `max_tokens`; use `max_completion_tokens` instead.
+                max_completion_tokens=20,
             )
         except OpenAIError as exc:
             raise AchievementAIError(f"OpenAI request failed: {exc}") from exc
