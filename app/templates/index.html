@@ -58,6 +58,66 @@
         max-height: 9rem;
         overflow: auto;
       }
+      .control-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+      .log-panel {
+        background: #0d1117;
+        color: #e6edf3;
+        padding: 1rem;
+        border-radius: 0.75rem;
+        font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        max-height: 320px;
+        overflow: auto;
+        border: 1px solid #161b22;
+      }
+      .log-entry {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-start;
+        padding: 0.35rem 0;
+        border-bottom: 1px solid #1f2933;
+      }
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+      .log-entry small {
+        color: #8b949e;
+        min-width: 84px;
+      }
+      .log-entry .label {
+        padding: 0.05rem 0.5rem;
+        border-radius: 0.4rem;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .log-entry .label.info {
+        background: rgba(99, 139, 255, 0.16);
+        color: #9db7ff;
+      }
+      .log-entry .label.success {
+        background: rgba(45, 212, 191, 0.16);
+        color: #5ad1c3;
+      }
+      .log-entry .label.error {
+        background: rgba(248, 113, 113, 0.16);
+        color: #fba9a9;
+      }
+      .inline-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .small-label {
+        font-size: 0.85rem;
+        color: var(--muted-color);
+      }
+      .stacked {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
     </style>
   </head>
   <body>
@@ -68,131 +128,484 @@
           Import Steam apps, parse community guides, detect the main-story achievement with OpenAI,
           fetch HowLongToBeat times, and compute engagement automatically.
         </p>
-        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap">
+        <div class="inline-actions">
           <a role="button" href="/docs" target="_blank">Open API docs</a>
-          <span class="pill">Analysis endpoint: POST /api/games/&lt;id&gt;/analyze</span>
+          <span class="pill">Use the panels below to call the API without leaving this page.</span>
         </div>
       </header>
 
       <section>
-        <h2>Games</h2>
-        {% if not games %}
-        <p class="secondary-text">No games stored yet. POST to /api/games to seed data.</p>
-        {% else %}
-        <div class="grid">
-          {% for game in games %}
-          {% set main_story = None %}
-          {% for ach in game.achievements %}
-          {% if ach.is_main_story_completion %}
-          {% set main_story = ach %}
-          {% endif %}
-          {% endfor %}
-          {% set latest_hltb = game.hltb_times[-1] if game.hltb_times else None %}
-          {% set latest_score = game.engagement_scores[-1] if game.engagement_scores else None %}
+        <h2>Operations console</h2>
+        <p class="secondary-text">
+          Drive every API endpoint from the UI: seed games, import from Steam, and run the full
+          analysis pipeline with detailed logging of each step.
+        </p>
+        <div class="grid control-grid">
           <article>
+            <header class="stacked">
+              <strong>Create a game</strong>
+              <span class="small-label">POST /api/games</span>
+            </header>
+            <form id="game-form">
+              <label>Title<input id="game-title" type="text" name="title" required /></label>
+              <label>Steam App ID<input id="game-steam" type="number" name="steam_app_id" /></label>
+              <label>Genre<input id="game-genre" type="text" name="genre" /></label>
+              <label>Platform<input id="game-platform" type="text" name="platform" /></label>
+              <label>Description<textarea id="game-description" name="description" rows="2"></textarea></label>
+              <button type="submit">Save game</button>
+            </form>
+          </article>
+
+          <article>
+            <header class="stacked">
+              <strong>Import from Steam</strong>
+              <span class="small-label">POST /api/steam/import</span>
+            </header>
+            <form id="steam-form">
+              <label
+                >App IDs (comma or newline separated)
+                <textarea id="steam-app-ids" name="app_ids_text" rows="4" required></textarea>
+              </label>
+              <button type="submit">Import achievements &amp; guides</button>
+            </form>
+          </article>
+
+          <article>
+            <header class="stacked">
+              <strong>Analyze a game</strong>
+              <span class="small-label">POST /api/games/&lt;id&gt;/analyze</span>
+            </header>
+            <form id="analyze-form">
+              <label>Game<select id="analyze-game" required></select></label>
+              <button type="submit">Run pipeline</button>
+            </form>
+          </article>
+
+          <article>
+            <header class="stacked">
+              <strong>Add achievement</strong>
+              <span class="small-label">POST /api/achievements</span>
+            </header>
+            <form id="achievement-form">
+              <label>Game<select id="achievement-game" required></select></label>
+              <label>Name<input id="achievement-name" type="text" required /></label>
+              <label>Description<textarea id="achievement-description" rows="2"></textarea></label>
+              <label>Completion rate (%)<input id="achievement-completion" type="number" min="0" max="100" step="0.01" /></label>
+              <button type="submit">Add achievement</button>
+            </form>
+          </article>
+
+          <article>
+            <header class="stacked">
+              <strong>Add guide</strong>
+              <span class="small-label">POST /api/guides</span>
+            </header>
+            <form id="guide-form">
+              <label>Game<select id="guide-game" required></select></label>
+              <label>Title<input id="guide-title" type="text" required /></label>
+              <label>URL<input id="guide-url" type="url" /></label>
+              <label>Author<input id="guide-author" type="text" /></label>
+              <button type="submit">Save guide</button>
+            </form>
+          </article>
+
+          <article>
+            <header class="stacked">
+              <strong>Parse guide content</strong>
+              <span class="small-label">POST /api/parsed-content</span>
+            </header>
+            <form id="parsed-form">
+              <label>Guide<select id="parsed-guide" required></select></label>
+              <label>Content<textarea id="parsed-content" rows="3" required></textarea></label>
+              <label>Section count<input id="parsed-sections" type="number" min="0" /></label>
+              <button type="submit">Attach parsed content</button>
+            </form>
+          </article>
+
+          <article>
+            <header class="stacked">
+              <strong>Log HLTB time</strong>
+              <span class="small-label">POST /api/hltb-times</span>
+            </header>
+            <form id="hltb-form">
+              <label>Game<select id="hltb-game" required></select></label>
+              <label>Main story hours<input id="hltb-main-story" type="number" min="0" step="0.1" /></label>
+              <label>Extras hours<input id="hltb-extras" type="number" min="0" step="0.1" /></label>
+              <label>Completionist hours<input id="hltb-completion" type="number" min="0" step="0.1" /></label>
+              <button type="submit">Record time</button>
+            </form>
+          </article>
+
+          <article>
+            <header class="stacked">
+              <strong>Add engagement score</strong>
+              <span class="small-label">POST /api/engagement-scores</span>
+            </header>
+            <form id="score-form">
+              <label>Game<select id="score-game" required></select></label>
+              <label>Score<input id="score-value" type="number" min="0" step="0.1" required /></label>
+              <label>Method<input id="score-method" type="text" placeholder="hltb_main_story + completion_rate" /></label>
+              <label>Notes<textarea id="score-notes" rows="2"></textarea></label>
+              <button type="submit">Store score</button>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap">
+          <h2>Activity log</h2>
+          <button id="refresh-games" type="button" class="secondary">Refresh games</button>
+        </div>
+        <p class="secondary-text">Each submission below captures the outbound request and server response.</p>
+        <div class="log-panel" id="log-panel" aria-live="polite"></div>
+      </section>
+
+      <section>
+        <h2>Games</h2>
+        <p class="secondary-text">The cards below reflect the latest data returned from the API.</p>
+        <div id="games-grid" class="grid"></div>
+        <p id="empty-state" class="secondary-text" style="display:none">No games stored yet. Use the console above to add one.</p>
+      </section>
+    </main>
+
+    <script>
+      const logPanel = document.getElementById("log-panel");
+      const gamesGrid = document.getElementById("games-grid");
+      const emptyState = document.getElementById("empty-state");
+      const refreshButton = document.getElementById("refresh-games");
+
+      const selects = {
+        analyze: document.getElementById("analyze-game"),
+        achievement: document.getElementById("achievement-game"),
+        guide: document.getElementById("guide-game"),
+        parsed: document.getElementById("parsed-guide"),
+        hltb: document.getElementById("hltb-game"),
+        score: document.getElementById("score-game"),
+      };
+
+      function log(message, type = "info") {
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        const time = new Date().toLocaleTimeString();
+        const label = document.createElement("span");
+        label.className = `label ${type}`;
+        label.textContent = type;
+        const timestamp = document.createElement("small");
+        timestamp.textContent = time;
+        const body = document.createElement("div");
+        body.textContent = message;
+        entry.append(timestamp, label, body);
+        logPanel.append(entry);
+        logPanel.scrollTop = logPanel.scrollHeight;
+      }
+
+      function setFormDisabled(form, disabled) {
+        Array.from(form.elements).forEach((el) => {
+          el.disabled = disabled;
+        });
+      }
+
+      async function postJSON(url, payload, label) {
+        log(`Sending ${label || url}...`);
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (err) {
+          // ignore JSON parse errors for empty responses
+        }
+        if (!response.ok) {
+          const detail = data?.detail || response.statusText;
+          throw new Error(Array.isArray(detail) ? detail.join("; ") : detail);
+        }
+        log(`${label || url} succeeded`, "success");
+        return data;
+      }
+
+      function option(text, value) {
+        const opt = document.createElement("option");
+        opt.text = text;
+        opt.value = value;
+        return opt;
+      }
+
+      function updateSelects(games) {
+        const gameOptions = games.map((g) => ({ value: g.id, text: `${g.title} (#${g.id})` }));
+        Object.values(selects)
+          .filter((el) => el !== selects.parsed)
+          .forEach((sel) => {
+            sel.innerHTML = "";
+            sel.append(option("Select a game", ""));
+            gameOptions.forEach((g) => sel.append(option(g.text, g.value)));
+          });
+
+        const guides = games.flatMap((g) => g.guides.map((guide) => ({
+          value: guide.id,
+          text: `${guide.title} (Game #${g.id})`,
+        })));
+        const parsedSelect = selects.parsed;
+        parsedSelect.innerHTML = "";
+        parsedSelect.append(option("Select a guide", ""));
+        guides.forEach((g) => parsedSelect.append(option(g.text, g.value)));
+      }
+
+      function renderGames(games) {
+        gamesGrid.innerHTML = "";
+        if (!games.length) {
+          emptyState.style.display = "block";
+          return;
+        }
+        emptyState.style.display = "none";
+        games.forEach((game) => {
+          const mainStory = game.achievements.find((a) => a.is_main_story_completion);
+          const latestHltb = game.hltb_times.at(-1);
+          const latestScore = game.engagement_scores.at(-1);
+          const parsedCount = game.guides.filter((g) => g.parsed_content && g.parsed_content.length).length;
+
+          const article = document.createElement("article");
+          article.innerHTML = `
             <header>
               <div style="display: flex; justify-content: space-between; gap: 1rem">
                 <div>
-                  <h3>{{ game.title }}</h3>
-                  <p class="secondary-text">
-                    {{ game.genre or "Unknown genre" }} · {{ game.platform or "Unknown platform" }}
-                  </p>
+                  <h3>${game.title}</h3>
+                  <p class="secondary-text">${game.genre || "Unknown genre"} · ${game.platform || "Unknown platform"}</p>
                 </div>
                 <div style="text-align: right">
-                  <span class="pill" title="Steam App ID">🎮 {{ game.steam_app_id or "N/A" }}</span>
+                  <span class="pill" title="Steam App ID">🎮 ${game.steam_app_id ?? "N/A"}</span>
+                  <div class="small-label">Game ID: ${game.id}</div>
                 </div>
               </div>
-              <p>{{ game.description or "No description available." }}</p>
+              <p>${game.description || "No description available."}</p>
             </header>
 
             <div class="section">
               <div style="display: flex; justify-content: space-between; align-items: center">
                 <h4>Achievements</h4>
-                <span class="pill">{{ game.achievements|length }} total</span>
+                <span class="pill">${game.achievements.length} total</span>
               </div>
-              {% if not game.achievements %}
-              <p class="secondary-text">No achievements imported yet.</p>
-              {% else %}
-              <ul>
-                {% for ach in game.achievements %}
-                <li>
-                  <strong>{{ ach.name }}</strong>
-                  {% if ach.is_main_story_completion %}<span class="badge-main">Main story</span>{% endif %}
-                  <br />
-                  <span class="secondary-text">{{ ach.description or "No description provided." }}</span>
-                  <div class="notes">
-                    {% if ach.completion_rate is not none %}
-                    Completion: {{ "%.2f"|format(ach.completion_rate) }}%
-                    {% else %}
-                    Completion data missing
-                    {% endif %}
-                  </div>
-                </li>
-                {% endfor %}
-              </ul>
-              {% endif %}
+              ${game.achievements.length === 0
+                ? "<p class=\"secondary-text\">No achievements imported yet.</p>"
+                : `<ul>${game.achievements
+                    .map((ach) => `
+                      <li>
+                        <strong>${ach.name}</strong>
+                        ${ach.is_main_story_completion ? '<span class="badge-main">Main story</span>' : ""}
+                        <br />
+                        <span class="secondary-text">${ach.description || "No description provided."}</span>
+                        <div class="notes">
+                          ${ach.completion_rate !== null && ach.completion_rate !== undefined
+                            ? `Completion: ${ach.completion_rate.toFixed(2)}%`
+                            : "Completion data missing"}
+                        </div>
+                      </li>
+                    `)
+                    .join("")}</ul>`}
             </div>
 
             <div class="section">
               <div style="display: flex; justify-content: space-between; align-items: center">
-                <h4>Guides &amp; parsed content</h4>
-                <span class="pill">{{ game.guides|length }} guides</span>
+                <h4>Guides & parsed content</h4>
+                <span class="pill">${game.guides.length} guides</span>
               </div>
-              {% if not game.guides %}
-              <p class="secondary-text">No guides discovered.</p>
-              {% else %}
-              <ul>
-                {% for guide in game.guides %}
-                <li>
-                  <strong>{{ guide.title }}</strong>
-                  {% if guide.parsed_content %}
-                  <span class="badge-main" style="background:#eefbf0;color:#1c6b2a;border-color:#c1e7c5">Parsed</span>
-                  {% endif %}
-                  <div class="notes">{{ guide.url or "No URL" }}</div>
-                  {% if guide.parsed_content %}
-                  <div class="content-preview muted-bg">
-                    {{ guide.parsed_content[0].content[:280] }}{% if guide.parsed_content[0].content|length > 280 %}...{% endif %}
-                  </div>
-                  {% else %}
-                  <div class="secondary-text">Awaiting parsing.</div>
-                  {% endif %}
-                </li>
-                {% endfor %}
-              </ul>
-              {% endif %}
+              ${game.guides.length === 0
+                ? "<p class=\"secondary-text\">No guides discovered.</p>"
+                : `<ul>${game.guides
+                    .map((guide) => `
+                      <li>
+                        <strong>${guide.title}</strong>
+                        ${guide.parsed_content?.length ? '<span class="badge-main" style="background:#eefbf0;color:#1c6b2a;border-color:#c1e7c5">Parsed</span>' : ""}
+                        <div class="notes">${guide.url || "No URL"}</div>
+                        ${guide.parsed_content?.length
+                          ? `<div class="content-preview muted-bg">${guide.parsed_content[0].content.slice(0, 280)}${guide.parsed_content[0].content.length > 280 ? "..." : ""}</div>`
+                          : '<div class="secondary-text">Awaiting parsing.</div>'}
+                      </li>
+                    `)
+                    .join("")}</ul>`}
             </div>
 
             <div class="section">
               <h4>HowLongToBeat</h4>
-              {% if latest_hltb and latest_hltb.main_story_hours %}
-              <p class="score">⏱️ Main story: {{ "%.2f"|format(latest_hltb.main_story_hours) }} hours</p>
-              {% else %}
-              <p class="secondary-text">No main-story time recorded yet.</p>
-              {% endif %}
+              ${latestHltb && latestHltb.main_story_hours
+                ? `<p class="score">⏱️ Main story: ${latestHltb.main_story_hours.toFixed(2)} hours</p>`
+                : '<p class="secondary-text">No main-story time recorded yet.</p>'}
             </div>
 
             <div class="section">
               <h4>Engagement score</h4>
-              {% if latest_score %}
-              <p class="score">⭐ {{ "%.1f"|format(latest_score.score) }}</p>
-              {% if latest_score.notes %}
-              <p class="notes">{{ latest_score.notes }}</p>
-              {% endif %}
-              {% else %}
-              <p class="secondary-text">Run the analysis endpoint to compute a score.</p>
-              {% endif %}
+              ${latestScore
+                ? `<p class="score">⭐ ${latestScore.score.toFixed(1)}</p>${latestScore.notes ? `<p class="notes">${latestScore.notes}</p>` : ""}`
+                : '<p class="secondary-text">Run the analysis endpoint to compute a score.</p>'}
             </div>
 
             <footer style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top: 1rem">
-              <span class="pill">Guides parsed: {{ game.guides | selectattr("parsed_content") | list | length }}</span>
-              <span class="pill">HLTB entries: {{ game.hltb_times|length }}</span>
-              <span class="pill">Scores: {{ game.engagement_scores|length }}</span>
+              <span class="pill">Guides parsed: ${parsedCount}</span>
+              <span class="pill">HLTB entries: ${game.hltb_times.length}</span>
+              <span class="pill">Scores: ${game.engagement_scores.length}</span>
+              ${mainStory ? `<span class="pill">Main story: ${mainStory.name}</span>` : ""}
             </footer>
-          </article>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </section>
-    </main>
+          `;
+          gamesGrid.append(article);
+        });
+      }
+
+      async function refreshGames() {
+        log("Fetching games from API...");
+        const response = await fetch("/api/games");
+        if (!response.ok) {
+          log("Failed to fetch games", "error");
+          return;
+        }
+        const games = await response.json();
+        updateSelects(games);
+        renderGames(games);
+        log(`Loaded ${games.length} game(s)`, "success");
+      }
+
+      function handleForm(formId, buildPayload, urlBuilder, label, onSuccess) {
+        const form = document.getElementById(formId);
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          setFormDisabled(form, true);
+          try {
+            const payload = buildPayload();
+            const url = typeof urlBuilder === "function" ? urlBuilder(payload) : urlBuilder;
+            const data = await postJSON(url, payload, label);
+            if (onSuccess) {
+              onSuccess(data, payload);
+            }
+            if (data?.notes) {
+              data.notes.forEach((note) => log(note));
+            }
+            await refreshGames();
+            log(JSON.stringify(data, null, 2), "info");
+          } catch (err) {
+            log(err.message, "error");
+          } finally {
+            setFormDisabled(form, false);
+          }
+        });
+      }
+
+      handleForm(
+        "game-form",
+        () => ({
+          title: document.getElementById("game-title").value,
+          steam_app_id: document.getElementById("game-steam").value || null,
+          genre: document.getElementById("game-genre").value || null,
+          platform: document.getElementById("game-platform").value || null,
+          description: document.getElementById("game-description").value || null,
+        }),
+        "/api/games",
+        "Create game"
+      );
+
+      handleForm(
+        "steam-form",
+        () => ({ app_ids_text: document.getElementById("steam-app-ids").value }),
+        "/api/steam/import",
+        "Steam import",
+        (data) => {
+          data?.results?.forEach((result) => {
+            const status = result.status === "error" ? "error" : "success";
+            const summary = [
+              `App ${result.app_id}`,
+              result.game_id ? `→ Game #${result.game_id}` : null,
+              result.created_game ? "created" : null,
+              result.achievements_added ? `${result.achievements_added} achievements` : null,
+              result.guides_added ? `${result.guides_added} guides` : null,
+            ]
+              .filter(Boolean)
+              .join(" | ");
+            log(summary || `App ${result.app_id}`, status === "success" ? "success" : "error");
+            if (result.error) {
+              log(result.error, "error");
+            }
+          });
+        }
+      );
+
+      handleForm(
+        "analyze-form",
+        () => ({ game_id: document.getElementById("analyze-game").value }),
+        (payload) => `/api/games/${payload.game_id}/analyze`,
+        "Analyze game",
+        (data, payload) => {
+          log(
+            `Analysis for game #${payload.game_id}: ` +
+              `main story = ${data.main_story_achievement ?? "n/a"}, ` +
+              `HLTB = ${data.hltb_main_story_hours ?? "n/a"} hours, ` +
+              `engagement = ${data.engagement_score ?? "n/a"}`,
+            "success"
+          );
+        }
+      );
+
+      handleForm(
+        "achievement-form",
+        () => ({
+          game_id: Number(document.getElementById("achievement-game").value),
+          name: document.getElementById("achievement-name").value,
+          description: document.getElementById("achievement-description").value || null,
+          completion_rate: document.getElementById("achievement-completion").value || null,
+        }),
+        "/api/achievements",
+        "Create achievement"
+      );
+
+      handleForm(
+        "guide-form",
+        () => ({
+          game_id: Number(document.getElementById("guide-game").value),
+          title: document.getElementById("guide-title").value,
+          url: document.getElementById("guide-url").value || null,
+          author: document.getElementById("guide-author").value || null,
+        }),
+        "/api/guides",
+        "Create guide"
+      );
+
+      handleForm(
+        "parsed-form",
+        () => ({
+          guide_id: Number(document.getElementById("parsed-guide").value),
+          content: document.getElementById("parsed-content").value,
+          section_count: document.getElementById("parsed-sections").value || null,
+        }),
+        "/api/parsed-content",
+        "Attach parsed content"
+      );
+
+      handleForm(
+        "hltb-form",
+        () => ({
+          game_id: Number(document.getElementById("hltb-game").value),
+          main_story_hours: document.getElementById("hltb-main-story").value || null,
+          extras_hours: document.getElementById("hltb-extras").value || null,
+          completionist_hours: document.getElementById("hltb-completion").value || null,
+        }),
+        "/api/hltb-times",
+        "Create HLTB time"
+      );
+
+      handleForm(
+        "score-form",
+        () => ({
+          game_id: Number(document.getElementById("score-game").value),
+          score: Number(document.getElementById("score-value").value),
+          method: document.getElementById("score-method").value || null,
+          notes: document.getElementById("score-notes").value || null,
+        }),
+        "/api/engagement-scores",
+        "Create engagement score"
+      );
+
+      refreshButton.addEventListener("click", refreshGames);
+      refreshGames();
+    </script>
   </body>
 </html>

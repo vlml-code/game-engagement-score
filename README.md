@@ -16,20 +16,25 @@ records.
 - Engagement scoring with error notes surfaced in the UI
 
 ## Getting started
-1. Install dependencies:
+1. Copy the sample environment and fill in the credentials you have:
+   ```bash
+   cp .env.example .env
+   # then edit .env to set API keys, throttling intervals, and database URL
+   ```
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-2. Configure the database URL (defaults to SQLite):
+3. Configure the database URL (defaults to SQLite) if you need something different:
    ```bash
    export DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/game_db"
    ```
-3. Run the API server:
+4. Run the API server:
    ```bash
    uvicorn app.main:app --reload
    ```
-4. Open the interactive docs at `http://127.0.0.1:8000/docs` and use the `/api/*` routes to add
-   data. The landing page at `/` renders a simple dashboard of stored games.
+5. Open the interactive docs at `http://127.0.0.1:8000/docs` and use the `/api/*` routes to add
+   data. The landing page at `/` renders an interactive dashboard that can call the APIs directly.
 
 ## Steam API configuration
 
