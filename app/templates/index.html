@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Engagement Score</title>
+    <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@2.0.6/css/pico.min.css" />
+    <style>
+      body {
+        padding: 2rem;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1rem;
+      }
+      .pill {
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        background: var(--muted-border-color);
+        font-size: 0.9rem;
+      }
+      .secondary-text {
+        color: var(--muted-color);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>Game Engagement Score</h1>
+        <p class="secondary-text">
+          Minimal FastAPI + SQLAlchemy stack with tables for games, achievements, guides, parsed guide
+          content, HLTB time data, and engagement scores.
+        </p>
+        <a role="button" href="/docs" target="_blank">Open API docs</a>
+      </header>
+
+      <section>
+        <h2>Games</h2>
+        {% if not games %}
+        <p class="secondary-text">No games stored yet. POST to /api/games to seed data.</p>
+        {% else %}
+        <div class="grid">
+          {% for game in games %}
+          <article>
+            <header>
+              <h3>{{ game.title }}</h3>
+              <p class="secondary-text">
+                {{ game.genre or "Unknown genre" }} · {{ game.platform or "Unknown platform" }}
+              </p>
+            </header>
+            <p>{{ game.description or "No description available." }}</p>
+            <footer>
+              <span class="pill">Achievements: {{ game.achievements|length }}</span>
+              <span class="pill">Guides: {{ game.guides|length }}</span>
+              <span class="pill">HLTB entries: {{ game.hltb_times|length }}</span>
+              <span class="pill">Scores: {{ game.engagement_scores|length }}</span>
+            </footer>
+          </article>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>
