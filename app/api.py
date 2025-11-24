@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud, models, schemas
 from app.config import get_settings
 from app.db import get_session
+from app.services import pipeline
 from app.services.steam import SteamService, SteamServiceError
 
 router = APIRouter()
@@ -293,6 +294,28 @@ async def import_from_steam(
             )
 
     return schemas.SteamImportResponse(results=results)
+
+
+@router.post(
+    "/games/{game_id}/analyze", response_model=schemas.AnalysisResponse
+)
+async def analyze_game(
+    game_id: int, session: AsyncSession = Depends(get_session)
+):
+    game = await crud.get_game(session, game_id)
+    if not game:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found")
+
+    result = await pipeline.analyze_game(session, game, get_settings())
+    return schemas.AnalysisResponse(
+        game_id=game_id,
+        main_story_achievement=(
+            result.main_story_achievement.name if result.main_story_achievement else None
+        ),
+        hltb_main_story_hours=result.hltb_hours,
+        engagement_score=result.engagement_score,
+        notes=result.notes,
+    )
 
 
 @router.get("/engagement-scores/{score_id}", response_model=schemas.EngagementScoreRead)

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -42,6 +42,10 @@ class Achievement(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     points: Mapped[int | None] = mapped_column(Integer)
+    completion_rate: Mapped[float | None] = mapped_column(Float)
+    is_main_story_completion: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
 
     game: Mapped[Game] = relationship(back_populates="achievements")
 

@@ -8,6 +8,14 @@ class AchievementBase(BaseModel):
     name: str
     description: Optional[str] = None
     points: Optional[int] = None
+    completion_rate: Optional[float] = Field(
+        default=None,
+        description="Global completion percent for this achievement if available",
+    )
+    is_main_story_completion: bool = Field(
+        default=False,
+        description="Flag set when this represents finishing the main story",
+    )
 
 
 class AchievementCreate(AchievementBase):
@@ -163,3 +171,11 @@ class SteamImportResult(BaseModel):
 
 class SteamImportResponse(BaseModel):
     results: list[SteamImportResult]
+
+
+class AnalysisResponse(BaseModel):
+    game_id: int
+    main_story_achievement: Optional[str] = None
+    hltb_main_story_hours: Optional[float] = None
+    engagement_score: Optional[float] = None
+    notes: list[str] = []

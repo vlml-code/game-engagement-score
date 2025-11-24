@@ -42,6 +42,31 @@ class SteamService:
                 await asyncio.sleep(wait_time)
             self._last_request = time.monotonic()
 
+    async def fetch_global_achievement_percentages(
+        self, app_id: int
+    ) -> dict[str, float]:
+        await self._throttle()
+        params = {"gameid": app_id}
+        url = (
+            "https://api.steampowered.com/ISteamUserStats/"
+            "GetGlobalAchievementPercentagesForApp/v0002/"
+        )
+        response = await self._client.get(url, params=params)
+        if response.status_code >= 400:
+            raise SteamServiceError(
+                f"Steam achievement percentages failed for app {app_id} with status {response.status_code}"
+            )
+
+        payload = response.json()
+        achievements = (
+            payload.get("achievementpercentages", {}).get("achievements", [])
+        )
+        return {
+            item.get("name"): float(item.get("percent", 0))
+            for item in achievements
+            if item.get("name")
+        }
+
     async def fetch_achievements(self, app_id: int) -> dict[str, Any]:
         await self._throttle()
         params = {"key": self.api_key, "appid": app_id}
@@ -60,11 +85,16 @@ class SteamService:
         game_name = game.get("gameName")
         stats = game.get("availableGameStats", {})
         achievements = stats.get("achievements", [])
+        try:
+            percents = await self.fetch_global_achievement_percentages(app_id)
+        except SteamServiceError:
+            percents = {}
         parsed = [
             {
                 "name": item.get("displayName") or item.get("name"),
                 "description": item.get("description"),
                 "points": item.get("defaultvalue"),
+                "completion_rate": percents.get(item.get("name")),
             }
             for item in achievements
             if item.get("displayName") or item.get("name")

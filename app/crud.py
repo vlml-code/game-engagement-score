@@ -78,27 +78,39 @@ async def add_achievements(
     session: AsyncSession, game_id: int, achievements: list[dict]
 ) -> int:
     existing = await session.execute(
-        select(models.Achievement.name).where(models.Achievement.game_id == game_id)
+        select(models.Achievement).where(models.Achievement.game_id == game_id)
     )
-    existing_names = {name for (name,) in existing.all()}
+    existing_by_name = {ach.name: ach for ach in existing.scalars().all()}
 
     new_rows: list[models.Achievement] = []
     for achievement in achievements:
         name = achievement.get("name")
-        if not name or name in existing_names:
+        if not name:
             continue
+        if name in existing_by_name:
+            existing_row = existing_by_name[name]
+            updated = False
+            for field in ("description", "points", "completion_rate"):
+                value = achievement.get(field)
+                if value is not None and getattr(existing_row, field) != value:
+                    setattr(existing_row, field, value)
+                    updated = True
+            if updated:
+                session.add(existing_row)
+            continue
+
         new_rows.append(
             models.Achievement(
                 game_id=game_id,
                 name=name,
                 description=achievement.get("description"),
                 points=achievement.get("points"),
+                completion_rate=achievement.get("completion_rate"),
             )
         )
-    if not new_rows:
-        return 0
+    if new_rows:
+        session.add_all(new_rows)
 
-    session.add_all(new_rows)
     await session.commit()
     return len(new_rows)
 
